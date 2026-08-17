@@ -5,28 +5,29 @@ sudo apt update && sudo apt upgrade -y
 sudo apt install -y mosquitto mosquitto-clients openssl
 sudo systemctl enable mosquitto
 sudo systemctl start mosquitto
-sudo systemctl status mosqutto
-pip3 install -y paho-mqtt --break-system-packages
-pip3 install -y cryptography --break-system-packages
+sudo systemctl status mosquitto
+pip3 install paho-mqtt --break-system-packages
+pip3 install cryptography --break-system-packages
 sudo apt install -y qrencode
 echo "Installing Dependencies..."
 
-mkdir /opt/entgen
+sudo mkdir /opt/entgen
 echo "Entgen folder created in Opt"
-cd entgen
-mkdir devices
-mkdir firmware
+cd /opt/entgen
+sudo mkdir devices
+sudo mkdir firmware
 echo "Devices and firmware folders created"
-cp save_ca_bootstrap.py /opt/entgen
-cp save_enrollment.py /opt/entgen
+cd ~/Entgen_Mobile_Dependencies
+sudo cp save_ca_bootstrap.py /opt/entgen/save_ca_bootstrap.py
+sudo cp save_enrollment.py /opt/entgen/save_enrollment.py
 echo "Python scripts moved to entgen"
 # Move services to systemD 
 # entgen-firmware makes the web server to host the files
 # entgen-enrollment captures the openADR info for the provisioning flow
 # entgen-ca-bootstrap runs a python script that runs the 2 CA system
-cp entgen-ca-bootstrap.service /etc/systemd/system
-cp entgen-enrollment.service /etc/systemd/system
-cp entgen-firmware.service /etc/systemd/system
+sudo cp entgen-ca-bootstrap.service /etc/systemd/system/entgen-ca-bootstrap.service
+sudo cp entgen-enrollment.service /etc/systemd/system/entgen-enrollment.service
+sudo cp entgen-firmware.service /etc/systemd/system/entgen-firmware.service
 
 
 BOOTSTRAP_SERVICE="entgen-ca-bootstrap.service"
@@ -66,7 +67,7 @@ else
 fi
 
 
-cat > /etc/mosquitto/conf.d/entgen.conf << EOF
+sudo tee /etc/mosquitto/conf.d/entgen.conf > /dev/null << 'EOF'
 # Plaintext listener — for local debugging only
 listener 1883
 password_file /etc/mosquitto/passwd
@@ -94,7 +95,6 @@ allow_anonymous false
 
 log_type all
 EOF
-
 
 # Detect the Pi's current IP for the SAN — must happen at script-run time,
 # not hardcoded, since every deployment's IP differs
