@@ -65,6 +65,37 @@ else
     echo "Failed to start $FIRMWARE_SERVICE."
 fi
 
+
+cat > /etc/mosquitto/conf.d/entgen.conf << EOF
+# Plaintext listener — for local debugging only
+listener 1883
+password_file /etc/mosquitto/passwd
+
+# MQTT over TLS — for Opta client
+listener 8883
+cafile   /etc/mosquitto/certs/ca.crt
+certfile /etc/mosquitto/certs/broker.crt
+keyfile  /etc/mosquitto/certs/broker.key
+tls_version tlsv1.2
+require_certificate true
+use_identity_as_username true
+acl_file /etc/mosquitto/acl.conf
+# MQTT over WSS — for Flutter app
+listener 9001
+protocol websockets
+cafile   /etc/mosquitto/certs/ca.crt
+certfile /etc/mosquitto/certs/broker.crt
+keyfile  /etc/mosquitto/certs/broker.key
+tls_version tlsv1.2
+require_certificate true
+
+# General
+allow_anonymous false
+
+log_type all
+EOF
+
+
 # Detect the Pi's current IP for the SAN — must happen at script-run time,
 # not hardcoded, since every deployment's IP differs
 # =============================================================================
@@ -156,3 +187,4 @@ qrencode -t ANSIUTF8 < ~/entgen_setup_payload.json
 echo ""
 echo "Scan this QR code from the Entgen app during first-time setup."
 echo "This payload is also saved at ~/entgen_setup_payload.json"
+
