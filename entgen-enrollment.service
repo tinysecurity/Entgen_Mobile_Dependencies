@@ -1,0 +1,13 @@
+[Unit]
+Description=Entgen Enrollment Config Saver
+After=mosquitto.service
+
+[Service]
+Type=simple
+User=trent
+ExecStart=/usr/bin/python3 /opt/entgen/save_enrollment.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
