@@ -9,6 +9,6 @@ Disclaimer: I am just 1 dev. These commands are were designed with a Debian-base
 - In your terminal: `git clone https://github.com/tinysecurity/Entgen_Mobile_Dependencies.git`
 - Change directory using `cd Entgen_Mobile_Dependencies` and `ls` to list all files.
 - You should see the install.sh in the list. To make it runnable, run `chmod +x install.sh`. This gives the file execution permissions.
-- To run it, type `.\install.sh` and hit enter.
+- To run it, type `source install.sh` and hit enter.
 - The installer should take care of the majority of the installation, but you may be asked to enter your password when it executes an action as the super user or approve a prompt. 
 - When finished, a QR code should pop up on the screen.
