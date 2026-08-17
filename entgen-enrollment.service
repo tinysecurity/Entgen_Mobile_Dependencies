@@ -4,7 +4,7 @@ After=mosquitto.service
 
 [Service]
 Type=simple
-User=trent
+User=root
 ExecStart=/usr/bin/python3 /opt/entgen/save_enrollment.py
 Restart=always
 RestartSec=5
