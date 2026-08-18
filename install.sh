@@ -155,15 +155,17 @@ MQTT_PASSWORD=$(openssl rand -base64 24 | tr -d '/+=' | head -c 24)
 
 sudo mosquitto_passwd -c -b /etc/mosquitto/passwd "${MQTT_USERNAME}" "${MQTT_PASSWORD}"
 
-sudo chmod 600 /etc/mosquitto/passwd
-sudo chgrp root /etc/mosquitto/passwd
+sudo chmod 640 /etc/mosquitto/passwd
+sudo chgrp mosquitto /etc/mosquitto/passwd
 sudo chown root /etc/mosquitto/passwd
+INSTALL_USER="${SUDO_USER:-$(whoami)}"
 sudo tee /opt/entgen/mqtt_credentials.env > /dev/null << EOF
 MQTT_USERNAME=${MQTT_USERNAME}
 MQTT_PASSWORD=${MQTT_PASSWORD}
 EOF
 sudo chmod 600 /opt/entgen/mqtt_credentials.env
 sudo chown root:root /opt/entgen/mqtt_credentials.env
+sudo chown "${INSTALL_USER}:${INSTALL_USER}" /opt/entgen/mqtt_credentials.env
 sudo systemctl enable mosquitto
 sudo systemctl start mosquitto
 sudo systemctl status mosquitto --no-pager
