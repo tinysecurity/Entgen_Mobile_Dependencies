@@ -1,16 +1,18 @@
 #!/bin/bash
 
-# grab the python and move them to opt
+# Install Dependencies 
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y mosquitto mosquitto-clients openssl
 sudo systemctl enable mosquitto
 sudo systemctl start mosquitto
 sudo systemctl status mosquitto
+sudo apt install -y qrencode
+# Install Pip stuff
 pip3 install paho-mqtt --break-system-packages
 pip3 install cryptography --break-system-packages
-sudo apt install -y qrencode
-echo "Installing Dependencies..."
 
+echo "Installing Dependencies..."
+# Make directories and move the Python Scripts and services
 sudo mkdir /opt/entgen
 echo "Entgen folder created in Opt"
 cd /opt/entgen
@@ -33,38 +35,10 @@ sudo cp entgen-firmware.service /etc/systemd/system/entgen-firmware.service
 BOOTSTRAP_SERVICE="entgen-ca-bootstrap.service"
 ENROLLMENT_SERVICE="entgen-enrollment.service"
 FIRMWARE_SERVICE="entgen-firmware.service"
-
+# Reload Daemons
 sudo systemctl daemon-reload
-# Enable service
-sudo systemctl enable $BOOTSTRAP_SERVICE
-sudo systemctl enable $ENROLLMENT_SERVICE
-sudo systemctl enable $FIRMWARE_SERVICE
 
-# Start service
-sudo systemctl start $BOOTSTRAP_SERVICE
-sudo systemctl start $ENROLLMENT_SERVICE
-sudo systemctl start $FIRMWARE_SERVICE
-
-if systemctl -q is-active $BOOTSTRAP_SERVICE
-then
-    echo "$BOOTSTRAP_SERVICE is up and running!"
-else
-    echo "Failed to start $BOOTSTRAP_SERVICE."
-fi
-
-if systemctl -q is-active $ENROLLMENT_SERVICE
-then
-    echo "$ENROLLMENT_SERVICE is up and running!"
-else
-    echo "Failed to start $ENROLLMENT_SERVICE."
-fi
-
-if systemctl -q is-active $FIRMWARE_SERVICE
-then
-    echo "$FIRMWARE_SERVICE is up and running!"
-else
-    echo "Failed to start $FIRMWARE_SERVICE."
-fi
+# Write entgen.conf
 
 
 sudo tee /etc/mosquitto/conf.d/entgen.conf > /dev/null << 'EOF'
@@ -95,7 +69,7 @@ allow_anonymous false
 
 log_type all
 EOF
-
+# Generate Certs
 # Detect the Pi's current IP for the SAN — must happen at script-run time,
 # not hardcoded, since every deployment's IP differs
 # =============================================================================
@@ -156,6 +130,44 @@ sudo mkdir -p /etc/mosquitto/certs
 sudo cp ca.crt broker.crt broker.key /etc/mosquitto/certs/
 sudo chown mosquitto: /etc/mosquitto/certs/*
 
+# Make passwd
+echo "Generated MQTT credentials for this install."
+sudo mosquitto_passwd -c -b /etc/mosquitto/passwd mozzy l1gmagett1
+sudo chown mosquitto:mosquitto /etc/mosquitto/passwd
+sudo chmod 600 /etc/mosquitto/passwd
+
+# Enable service
+sudo systemctl enable $BOOTSTRAP_SERVICE
+sudo systemctl enable $ENROLLMENT_SERVICE
+sudo systemctl enable $FIRMWARE_SERVICE
+
+# Start service
+sudo systemctl start $BOOTSTRAP_SERVICE
+sudo systemctl start $ENROLLMENT_SERVICE
+sudo systemctl start $FIRMWARE_SERVICE
+
+if systemctl -q is-active $BOOTSTRAP_SERVICE
+then
+    echo "$BOOTSTRAP_SERVICE is up and running!"
+else
+    echo "Failed to start $BOOTSTRAP_SERVICE."
+fi
+
+if systemctl -q is-active $ENROLLMENT_SERVICE
+then
+    echo "$ENROLLMENT_SERVICE is up and running!"
+else
+    echo "Failed to start $ENROLLMENT_SERVICE."
+fi
+
+if systemctl -q is-active $FIRMWARE_SERVICE
+then
+    echo "$FIRMWARE_SERVICE is up and running!"
+else
+    echo "Failed to start $FIRMWARE_SERVICE."
+fi
+
+
 # =============================================================================
 # Step: Generate a random, per-install MQTT credential
 # Random diversification means a leaked or never-rotated credential on
@@ -163,27 +175,23 @@ sudo chown mosquitto: /etc/mosquitto/certs/*
 # password rotation feature (Phase 7) later gives the installer/user a
 # way to change — but the INITIAL value must never be a shared constant.
 # =============================================================================
-MQTT_USERNAME="entgen"
-MQTT_PASSWORD=$(openssl rand -base64 24 | tr -d '/+=' | head -c 24)
+#MQTT_USERNAME="entgen"
+#MQTT_PASSWORD=$(openssl rand -base64 24 | tr -d '/+=' | head -c 24)
 
-echo "Generated MQTT credentials for this install."
-sudo mosquitto_passwd -c -b /etc/mosquitto/passwd "${MQTT_USERNAME}" "${MQTT_PASSWORD}"
-sudo chown mosquitto:mosquitto /etc/mosquitto/passwd
-sudo chmod 600 /etc/mosquitto/passwd
-
-
+# Make payload for QR 
 SETUP_PAYLOAD=$(cat << JSON
 {
   "broker_ip": "${PI_IP}",
   "broker_ca": "$(awk '{printf "%s\\n", $0}' ca.crt | head -c -1)",
-  "mqtt_username": "${MQTT_USERNAME}",
-  "mqtt_password": "${MQTT_PASSWORD}"
+  "mqtt_username": "mozzy",
+  "mqtt_password": "l1gmagett1"
 }
 JSON
 )
 
 echo "${SETUP_PAYLOAD}" > ~/entgen_setup_payload.json
 qrencode -t ANSIUTF8 < ~/entgen_setup_payload.json
+
 echo ""
 echo "Scan this QR code from the Entgen app during first-time setup."
 echo "This payload is also saved at ~/entgen_setup_payload.json"
