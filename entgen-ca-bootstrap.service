@@ -3,8 +3,8 @@ Description=Entgen CA Bootstrap Listener
 After=mosquitto.service
 
 [Service]
-Type=root
-User=trent
+Type=simple
+User=root
 ExecStart=/usr/bin/python3 -u /opt/entgen/save_ca_bootstrap.py
 Restart=always
 RestartSec=5

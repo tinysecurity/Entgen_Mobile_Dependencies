@@ -4,8 +4,30 @@ import os
 
 BROKER   = 'localhost'
 PORT     = 1883
-USERNAME = 'mozzy'
-PASSWORD = 'l1gmagett1'
+
+# ── MQTT credentials — loaded from the install script's generated file,
+# never hardcoded. Random per-deployment (see install.sh), so this must
+# be read at runtime rather than baked into source. ────────────────────
+CREDENTIALS_PATH = '/opt/entgen/mqtt_credentials.env'
+
+def load_mqtt_credentials():
+    creds = {}
+    try:
+        with open(CREDENTIALS_PATH) as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#') or '=' not in line:
+                    continue
+                key, _, value = line.partition('=')
+                creds[key.strip()] = value.strip()
+    except FileNotFoundError:
+        print(f'FATAL: {CREDENTIALS_PATH} not found. Did install.sh run?')
+        raise
+    if 'MQTT_USERNAME' not in creds or 'MQTT_PASSWORD' not in creds:
+        raise ValueError(f'{CREDENTIALS_PATH} missing MQTT_USERNAME or MQTT_PASSWORD')
+    return creds['MQTT_USERNAME'], creds['MQTT_PASSWORD']
+
+USERNAME, PASSWORD = load_mqtt_credentials()
 SAVE_DIR = '/opt/entgen/devices'
 
 def on_connect(client, userdata, flags, reason_code, properties):

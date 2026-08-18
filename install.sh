@@ -6,8 +6,8 @@ sudo apt install -y mosquitto mosquitto-clients openssl
 
 sudo apt install -y qrencode
 # Install Pip stuff
-pip3 install paho-mqtt --break-system-packages
-pip3 install cryptography --break-system-packages
+sudo pip3 install paho-mqtt python-etcd --break-system-packages
+sudo pip3 install cryptography --break-system-packages
 
 echo "Installing Dependencies..."
 # Make directories and move the Python Scripts and services
@@ -67,6 +67,30 @@ allow_anonymous false
 
 log_type all
 EOF
+echo "--------------ENTGEN CONF ADDED--------------------"
+sudo tee /etc/mosquitto/acl.conf > /dev/null << 'EOF'
+# Bootstrap identity — permanently restricted, write-only, one topic.
+# CN comes from the shared bootstrap cert already in ca_bootstrap_service.dart.
+user entgen-flutter-client
+topic write entgen/bootstrap/ca-delivery
+# No read grants at all — this identity cannot even see the ack it
+# triggers. It does not need to; ensureCaDelivered() reads the ack using
+# the SAME bootstrap connection's own subscription, which is a normal
+# client-side subscribe, not a broker-granted read on someone else's data.
+# Actually: the bootstrap client DOES need to subscribe to its own ack
+# topic to receive it. Add:
+topic read entgen/bootstrap/+/ack
+
+# Everything else — real per-device identities (entgen-device-*) —
+# unrestricted for now (matches existing behavior). Per-device ACL
+# scoping (a device only touching its own topics) is a separate,
+# future hardening item, not part of this specific fix.
+pattern readwrite entgen/#
+EOF
+
+echo "----------------ACL CONF ADDED-------------------------"
+sudo chown mosquitto:mosquitto /etc/mosquitto/acl.conf
+sudo chmod 0700 /etc/mosquitto/acl.conf
 # Generate Certs
 # Detect the Pi's current IP for the SAN — must happen at script-run time,
 # not hardcoded, since every deployment's IP differs
@@ -108,15 +132,8 @@ openssl x509 -req -days 3650 \
     -CA ca.crt -CAkey ca.key -CAcreateserial \
     -out broker.crt \
     -extensions v3_req -extfile broker_ext.cnf
-
-# =============================================================================
-# Step: Append the FIXED canonical Entwise Bootstrap CA
-# This file ships as a static asset in the repo — NEVER generated here,
-# NEVER unique per install. Every deployment must trust the same one,
-# because every phone's app binary presents the same hardcoded bootstrap
-# client cert, signed once, forever, by this one canonical CA.
-# =============================================================================
 cd ~/Entgen_Mobile_Dependencies
+
 if [ ! -f "./entwise-bootstrap-ca.crt" ]; then
     echo "ERROR: entwise-bootstrap-ca.crt not found in repo — cannot proceed."
     echo "This file must ship alongside install.sh, not be generated."
@@ -127,17 +144,29 @@ cat entwise-bootstrap-ca.crt >> ca.crt
 echo "Canonical Entwise Bootstrap CA appended to ca.crt."
 
 sudo mkdir -p /etc/mosquitto/certs
+cd ~/certs
 sudo cp ca.crt broker.crt broker.key /etc/mosquitto/certs/
 sudo chown mosquitto: /etc/mosquitto/certs/*
 
 # Make passwd
 echo "Generated MQTT credentials for this install."
-sudo mosquitto_passwd -c -b /etc/mosquitto/passwd mozzy l1gmagett1
-sudo chown mosquitto:mosquitto /etc/mosquitto/passwd
+MQTT_USERNAME="entgen"
+MQTT_PASSWORD=$(openssl rand -base64 24 | tr -d '/+=' | head -c 24)
+
+sudo mosquitto_passwd -c -b /etc/mosquitto/passwd "${MQTT_USERNAME}" "${MQTT_PASSWORD}"
+
 sudo chmod 600 /etc/mosquitto/passwd
+sudo chgrp root /etc/mosquitto/passwd
+sudo chown root /etc/mosquitto/passwd
+sudo tee /opt/entgen/mqtt_credentials.env > /dev/null << EOF
+MQTT_USERNAME=${MQTT_USERNAME}
+MQTT_PASSWORD=${MQTT_PASSWORD}
+EOF
+sudo chmod 600 /opt/entgen/mqtt_credentials.env
+sudo chown root:root /opt/entgen/mqtt_credentials.env
 sudo systemctl enable mosquitto
 sudo systemctl start mosquitto
-sudo systemctl status mosquitto
+sudo systemctl status mosquitto --no-pager
 # Enable service
 sudo systemctl enable $BOOTSTRAP_SERVICE
 sudo systemctl enable $ENROLLMENT_SERVICE
@@ -150,47 +179,38 @@ sudo systemctl start $FIRMWARE_SERVICE
 
 if systemctl -q is-active $BOOTSTRAP_SERVICE
 then
-    echo "$BOOTSTRAP_SERVICE is up and running!"
+    echo "$BOOTSTRAP_SERVICE RUNNING!"
 else
     echo "Failed to start $BOOTSTRAP_SERVICE."
 fi
 
 if systemctl -q is-active $ENROLLMENT_SERVICE
 then
-    echo "$ENROLLMENT_SERVICE is up and running!"
+    echo "$ENROLLMENT_SERVICE RUNNING!"
 else
     echo "Failed to start $ENROLLMENT_SERVICE."
 fi
 
 if systemctl -q is-active $FIRMWARE_SERVICE
 then
-    echo "$FIRMWARE_SERVICE is up and running!"
+    echo "$FIRMWARE_SERVICE RUNNING!"
 else
     echo "Failed to start $FIRMWARE_SERVICE."
 fi
 
 
-# =============================================================================
-# Step: Generate a random, per-install MQTT credential
-# Random diversification means a leaked or never-rotated credential on
-# ONE deployment never compromises any other. This is what the broker
-# password rotation feature (Phase 7) later gives the installer/user a
-# way to change — but the INITIAL value must never be a shared constant.
-# =============================================================================
-#MQTT_USERNAME="entgen"
-#MQTT_PASSWORD=$(openssl rand -base64 24 | tr -d '/+=' | head -c 24)
 
 # Make payload for QR 
 SETUP_PAYLOAD=$(cat << JSON
 {
   "broker_ip": "${PI_IP}",
   "broker_ca": "$(awk '{printf "%s\\n", $0}' ca.crt | head -c -1)",
-  "mqtt_username": "mozzy",
-  "mqtt_password": "l1gmagett1"
+  "mqtt_username": "${MQTT_USERNAME}",
+  "mqtt_password": "${MQTT_PASSWORD}"
 }
 JSON
 )
-
+echo "-----------PAYLOAD GENERATED------------"
 echo "${SETUP_PAYLOAD}" > ~/entgen_setup_payload.json
 qrencode -t ANSIUTF8 < ~/entgen_setup_payload.json
 
@@ -198,3 +218,7 @@ echo ""
 echo "Scan this QR code from the Entgen app during first-time setup."
 echo "This payload is also saved at ~/entgen_setup_payload.json"
 
+cd ~
+echo "BROKER: ${MQTT_USERNAME}"
+echo "PASS: ${MQTT_PASSWORD}"
+echo "-------SETUP COMPLETE----------"
