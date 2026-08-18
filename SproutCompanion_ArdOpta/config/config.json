@@ -1,0 +1,24 @@
+{
+  "wifi_ssid": "REPLACE_WITH_SSID",
+  "wifi_password": "REPLACE_WITH_PASSWORD",
+  "mac": [178, 244, 235, 162, 28, 36],
+  "ip": "192.168.50.10",
+  "subnet": "255.255.255.0",
+  "gateway": "192.168.50.1",
+  "dns": "192.168.50.1",
+  "broker_ip": "192.168.50.5",
+  "broker_password": "REPLACE_WITH_PASSWORD",
+  "topics": [
+    {"name": "device_status", "topic": "sprout/status", "data_type": "STR", "init_value": "OFFLINE", "pub_flag": true, "sub_flag": false, "is_will": true},
+    {"name": "input_button1", "topic": "sprout/input/button_1", "data_type": "BOOL", "init_value": false, "pub_flag": false, "sub_flag": true, "is_will": false},
+    {"name": "input_button2", "topic": "sprout/input/button_2", "data_type": "BOOL", "init_value": false, "pub_flag": false, "sub_flag": true, "is_will": false},
+    {"name": "input_num1", "topic": "sprout/input/number_1", "data_type": "FLOAT32", "init_value": 3.14159, "pub_flag": false, "sub_flag": true, "is_will": false},
+    {"name": "input_num2", "topic": "sprout/input/number_2", "data_type": "FLOAT32", "init_value": 3.14159, "pub_flag": false, "sub_flag": true, "is_will": false},
+    {"name": "input_str", "topic": "sprout/input/string_cmd", "data_type": "STR", "init_value": "Hello, World", "pub_flag": false, "sub_flag": true, "is_will": false},
+    {"name": "output_status1", "topic": "sprout/output/status_1", "data_type": "BOOL", "init_value": false, "pub_flag": true, "sub_flag": false, "is_will": false},
+    {"name": "output_status2", "topic": "sprout/output/status_2", "data_type": "BOOL", "init_value": false, "pub_flag": true, "sub_flag": false, "is_will": false},
+    {"name": "output_num1", "topic": "sprout/output/number_1", "data_type": "FLOAT32", "init_value": 2.71828, "pub_flag": true, "sub_flag": false, "is_will": false},
+    {"name": "output_num2", "topic": "sprout/output/number_2", "data_type": "FLOAT32", "init_value": 2.71828, "pub_flag": true, "sub_flag": false, "is_will": false},
+    {"name": "output_str", "topic": "sprout/output/string_log", "data_type": "STR", "init_value": "Hello, User", "pub_flag": true, "sub_flag": false, "is_will": false}
+  ]
+}

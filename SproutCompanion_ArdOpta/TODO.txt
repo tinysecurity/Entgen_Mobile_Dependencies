@@ -1,0 +1,141 @@
+SPROUT COMPANION - DEVELOPMENT TO-DO LIST
+===========================================
+Target platform: Arduino Opta (primary)
+
+DESCRIPTION
+--------------
+Provides a user with a ready-made Opta sketch to connect to Sprout commands and add their own code.
+
+
+1. REMOVE UNNEEDED CONTENT
+----------------------------------------
+
+LIBRARIES
+#include <WiFi.h>
+#include <WiFiServer.h>
+#include <WiFiUdp.h>
+#include <BlockDevice.h>
+#include <LittleFileSystem.h>
+#include <MBRBlockDevice.h>
++x #include <ArduinoRS485.h>
++x #include <ArduinoModbus.h>
+#include <SPI.h>
++x #include <Ethernet.h>
+#include <ArduinoMqttClient.h>
++x #include <ArduinoJson.h>
+#include <mbed.h>
+
+CONFIGURATIONS
+Filesystem
+Enrollment Configuration Structure
+Network Configuration
+	WiFi
++x 	Ethernet
++x 	Modbus
+	MQTT
++x OpenADR Configuration
++x Command Arbitration Configuration
+
+SETUP
+Launch Serial
++x Set Relay
+Load configs from flash
+Launch WiFi
++x Launch Ethernet
++x Launch Modbus
+Launch MQTT
+
+LOOP
+Reconnect WiFi
++x Reconnect Ethernet
+Reconnect MQTT
++x Reconnect Modbus
+Poll MQTT
+Reconfiguration handler
++x Determine dispatch authority
++x Dispatch relay
+
+FUNCTIONS
+Filesystem mount
++x Copy JSON String Field
++x Copy JSON IP Field
++x Copy JSON MAC Field
+Load configuration from flash
+Save configuration to flash
+Apply online reconfiguration
+Connect WiFi
++x Connect Ethernet
++x Set up Modbus TCP
++x Set up Modbus RTU
++x Read Modbus input register
++x Read Modbus holding register
+Connect MQTT
+Subscribe to MQTT topics
+onMQTTMessage handler
++x Update Relay output
++x Reset command slot
++x Initialize the default source
++x Parse an OpenADR Dispatch
++x Handle a parsed command
++x Resolve Dispatch authority
++x Publish an enrollment report
++x Publish an event status report
++x Parse a report request
++x Build an enrollment report
++x Build an event status report
++x Serialize a report to JSON
+
+
+2. CONFIGURATION FILE
+----------------------
+[x] Create a configuration JSON file including
+	wifiSSID
+	wifiPassword
+	mac address
+	local wifi ip address
+	gateway
+	subnet
+	dns
+	Topic Table
+[x] Create a configuration structure & instance with fields matching the fields in the configuration file
+[x] Define lengths for the configuration structure elements
+[x] Implement a check to confirm that the memory was partitioned and prompt the user to run QSPIFormat if not
+[x] Reintroduce the JSON handling functions and library calls
+[x] Update loadConfigFromFlash
+[x] Update saveConfigToFlash
+
+
+3. WIFI CONFIGURATION AND FUNCTIONS
+------------------------------------
+[x] Review and update WiFi connection delay and retry logic - make this more status based to reduce unneeded downtime
+
+
+4. MQTT CONFIGURATION AND FUNCTIONS
+------------------------------------
+[x] Update Subscription function
+[ ] Add a Publish function
+
+
+5. MESSAGE HANDLERS
+--------------------
+[ ] Update onMqttMessage to set a topic flag rather than calling a function to handle the message
+[ ] Update onMqttMessage to output the payload to a topic storage variable
+[ ] Create a function in Loop to find the active topics and call their handlers
+[ ] Create handler stubs for the subscribed topics
+[ ] Create publish stubs for the published topics
+[ ] Create a helper function to publish all the published topics when they get updated (similar to onMqttMessage) 
+
+
+6. LIVE RECONFIGURATION
+------------------------
+[ ] Update ReconfigResult function to indicate new statuses
+[ ] Update applyReconfiguration with new configuration structure
+
+7. DOCUMENTATION
+-----------------
+[ ] Update the header in the program to describe what this does
+[ ] README explaining the core program
+[ ] README to explain how to set up an MQTT broker and connect it to our stuff (including how to set up the configuration file)
+	On your laptop
+	On a raspberry pi
+[ ] README to explain how to load the config file onto the Arduino
