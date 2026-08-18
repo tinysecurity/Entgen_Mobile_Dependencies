@@ -116,11 +116,13 @@ openssl x509 -req -days 3650 \
 # because every phone's app binary presents the same hardcoded bootstrap
 # client cert, signed once, forever, by this one canonical CA.
 # =============================================================================
+cd ~/Entgen_Mobile_Dependencies
 if [ ! -f "./entwise-bootstrap-ca.crt" ]; then
     echo "ERROR: entwise-bootstrap-ca.crt not found in repo — cannot proceed."
     echo "This file must ship alongside install.sh, not be generated."
     exit 1
 fi
+
 cat entwise-bootstrap-ca.crt >> ca.crt
 echo "Canonical Entwise Bootstrap CA appended to ca.crt."
 
