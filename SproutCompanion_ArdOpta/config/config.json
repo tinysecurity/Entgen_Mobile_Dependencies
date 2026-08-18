@@ -10,6 +10,7 @@
   "broker_password": "REPLACE_WITH_PASSWORD",
   "topics": [
     {"name": "device_status", "topic": "sprout/status", "data_type": "STR", "init_value": "OFFLINE", "pub_flag": true, "sub_flag": false, "is_will": true},
+    {"name": "reconfiguration", "topic": "sprout/reconfiguration", "data_type": "STR", "init_value": "{\"content\": \"zero\"}", "pub_flag": false, "sub_flag": true, "is_will": false},
     {"name": "input_button1", "topic": "sprout/input/button_1", "data_type": "BOOL", "init_value": false, "pub_flag": false, "sub_flag": true, "is_will": false},
     {"name": "input_button2", "topic": "sprout/input/button_2", "data_type": "BOOL", "init_value": false, "pub_flag": false, "sub_flag": true, "is_will": false},
     {"name": "input_num1", "topic": "sprout/input/number_1", "data_type": "FLOAT32", "init_value": 3.14159, "pub_flag": false, "sub_flag": true, "is_will": false},

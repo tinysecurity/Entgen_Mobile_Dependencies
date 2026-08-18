@@ -113,29 +113,29 @@ onMQTTMessage handler
 4. MQTT CONFIGURATION AND FUNCTIONS
 ------------------------------------
 [x] Update Subscription function
-[ ] Add a Publish function
+[x] Add a Publish function
 
 
 5. MESSAGE HANDLERS
 --------------------
-[ ] Update onMqttMessage to set a topic flag rather than calling a function to handle the message
-[ ] Update onMqttMessage to output the payload to a topic storage variable
-[ ] Create a function in Loop to find the active topics and call their handlers
-[ ] Create handler stubs for the subscribed topics
-[ ] Create publish stubs for the published topics
-[ ] Create a helper function to publish all the published topics when they get updated (similar to onMqttMessage) 
+[x] Update onMqttMessage to set a topic flag rather than calling a function to handle the message
+[x] Update onMqttMessage to output the payload to a topic storage variable
+[x] Create a function in Loop to find the active topics and call their handlers
+[x] Create handler stubs for the subscribed topics
+[x] Create publish stubs for the published topics
+[x] Create a helper function to publish all the published topics when they get updated (similar to onMqttMessage) 
 
 
 6. LIVE RECONFIGURATION
 ------------------------
-[ ] Update ReconfigResult function to indicate new statuses
-[ ] Update applyReconfiguration with new configuration structure
+[x] Update ReconfigResult function to indicate new statuses
+[x] Update applyReconfiguration with new configuration structure
 
 7. DOCUMENTATION
 -----------------
-[ ] Update the header in the program to describe what this does
-[ ] README explaining the core program
-[ ] README to explain how to set up an MQTT broker and connect it to our stuff (including how to set up the configuration file)
+[x] Update the header in the program to describe what this does
+[x] README explaining the core program
+[x] README to explain how to set up an MQTT broker and connect it to our stuff (including how to set up the configuration file)
 	On your laptop
 	On a raspberry pi
 [ ] README to explain how to load the config file onto the Arduino
