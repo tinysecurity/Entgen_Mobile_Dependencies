@@ -3,9 +3,7 @@
 # Install Dependencies 
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y mosquitto mosquitto-clients openssl
-sudo systemctl enable mosquitto
-sudo systemctl start mosquitto
-sudo systemctl status mosquitto
+
 sudo apt install -y qrencode
 # Install Pip stuff
 pip3 install paho-mqtt --break-system-packages
@@ -135,7 +133,9 @@ echo "Generated MQTT credentials for this install."
 sudo mosquitto_passwd -c -b /etc/mosquitto/passwd mozzy l1gmagett1
 sudo chown mosquitto:mosquitto /etc/mosquitto/passwd
 sudo chmod 600 /etc/mosquitto/passwd
-
+sudo systemctl enable mosquitto
+sudo systemctl start mosquitto
+sudo systemctl status mosquitto
 # Enable service
 sudo systemctl enable $BOOTSTRAP_SERVICE
 sudo systemctl enable $ENROLLMENT_SERVICE
