@@ -86,6 +86,7 @@ topic read entgen/bootstrap/+/ack
 # scoping (a device only touching its own topics) is a separate,
 # future hardening item, not part of this specific fix.
 pattern readwrite entgen/#
+pattern read $SYS/broker/uptime
 EOF
 
 echo "----------------ACL CONF ADDED-------------------------"
@@ -201,26 +202,36 @@ else
 fi
 
 
+# Make payload for QR — built with Python's json module, not shell string
+# munging, so newlines inside the multi-line CA cert get properly escaped
+# as \n rather than landing as literal, JSON-breaking line breaks.
+python3 -c "
+import json
 
-# Make payload for QR 
-SETUP_PAYLOAD=$(cat << JSON
-{
-  "broker_ip": "${PI_IP}",
-  "broker_ca": "$(awk '{printf "%s\\n", $0}' ca.crt | head -c -1)",
-  "mqtt_username": "${MQTT_USERNAME}",
-  "mqtt_password": "${MQTT_PASSWORD}"
+with open('ca.crt') as f:
+    ca_pem = f.read()
+
+payload = {
+    'broker_ip':     '${PI_IP}',
+    'broker_ca':     ca_pem,
+    'mqtt_username': '${MQTT_USERNAME}',
+    'mqtt_password': '${MQTT_PASSWORD}',
 }
-JSON
-)
-echo "-----------PAYLOAD GENERATED------------"
-echo "${SETUP_PAYLOAD}" > ~/entgen_setup_payload.json
-qrencode -t ANSIUTF8 < ~/entgen_setup_payload.json
 
+with open('${HOME}/entgen_setup_payload.json', 'w') as f:
+    json.dump(payload, f)
+"
+echo "-----------PAYLOAD GENERATED------------"
+cp ${HOME}/entgen_setup_payload.json /opt/entgen/firmware/entgen_setup_payload.json
+qrencode -t ANSIUTF8 < ~/entgen_setup_payload.json
+sudo cp ~/entgen_setup_payload.json /opt/entgen/firmware/entgen_setup_payload.json
 echo ""
 echo "Scan this QR code from the Entgen app during first-time setup."
 echo "This payload is also saved at ~/entgen_setup_payload.json"
 
 cd ~
+echo "You can also join the broker to your Entgen App at http://${PI_IP}:8080/entgen_setup_payload.json"
 echo "BROKER: ${MQTT_USERNAME}"
 echo "PASS: ${MQTT_PASSWORD}"
 echo "-------SETUP COMPLETE----------"
+
