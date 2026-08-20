@@ -98,16 +98,45 @@ sudo chmod 0700 /etc/mosquitto/acl.conf
 # =============================================================================
 # Step: Generate this deployment's own broker CA + cert (SAN-aware)
 # =============================================================================
+# =============================================================================
+# Step: Generate this deployment's own broker CA + cert (SAN-aware, IDEMPOTENT)
+#
+# FIX 1 — Pi CA is now persistent across runs. Previously regenerated
+# from scratch every install.sh run, silently invalidating every phone
+# CA save_ca_bootstrap.py had appended to the LIVE
+# /etc/mosquitto/certs/ca.crt since the last regeneration.
+#
+# FIX 2 — the canonical bootstrap CA append was targeting the WRONG
+# FILE. The previous version did `cd ~/Entgen_Mobile_Dependencies`
+# before `cat entwise-bootstrap-ca.crt >> ca.crt`, which appended to a
+# ca.crt in the REPO directory, not the one in ~/certs that actually
+# gets copied to /etc/mosquitto/certs/ two steps later. As written, the
+# deployed ca.crt never actually received the bootstrap CA at all — any
+# earlier "working" result was very likely a leftover stray file from
+# manual testing, not this logic actually succeeding. Fixed below by
+# referencing the repo file via its full path, with no `cd` away from
+# ~/certs required at all.
+# =============================================================================
+REPO_DIR=~/Entgen_Mobile_Dependencies
+CERT_DIR=/etc/mosquitto/certs
+
 mkdir -p ~/certs && cd ~/certs
 
 PI_IP=$(ip -4 addr show wlan0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
 echo "Detected Pi IP: ${PI_IP}"
 
-openssl genrsa -out ca.key 2048
-openssl req -new -x509 -days 3650 \
-    -key ca.key \
-    -out ca.crt \
-    -subj "/CN=EntgenCA/O=Entgen/C=US"
+if sudo test -f "${CERT_DIR}/ca.crt" && sudo test -f "${CERT_DIR}/ca.key"; then
+    echo "Existing Pi CA found — reusing it (not regenerating)."
+    sudo cp "${CERT_DIR}/ca.key" ca.key
+    sudo cp "${CERT_DIR}/ca.crt" ca.crt
+else
+    echo "No existing Pi CA found — generating a new one (first install)."
+    openssl genrsa -out ca.key 2048
+    openssl req -new -x509 -days 3650 \
+        -key ca.key \
+        -out ca.crt \
+        -subj "/CN=EntgenCA/O=Entgen/C=US"
+fi
 
 openssl genrsa -out broker.key 2048
 openssl req -new \
@@ -115,7 +144,7 @@ openssl req -new \
     -out broker.csr \
     -subj "/CN=entgen-broker.local/O=Entgen/C=US"
 
-cat > broker_ext.cnf << EOF
+cat > broker_ext.cnf << CNFEOF
 [req]
 req_extensions = v3_req
 distinguished_name = req_distinguished_name
@@ -126,7 +155,7 @@ subjectAltName = @alt_names
 DNS.1 = entgen-broker.local
 IP.1  = 127.0.0.1
 IP.2  = ${PI_IP}
-EOF
+CNFEOF
 
 openssl x509 -req -days 3650 \
     -in broker.csr \
@@ -134,22 +163,31 @@ openssl x509 -req -days 3650 \
     -out broker.crt \
     -extensions v3_req -extfile broker_ext.cnf
 
-cd ~/Entgen_Mobile_Dependencies
+# ── Canonical bootstrap CA — referenced by FULL PATH, no cd required,
+# no risk of appending to the wrong file. Still safely in ~/certs here.
+BOOTSTRAP_CA_FILE="${REPO_DIR}/entwise-bootstrap-ca.crt"
 
-if [ ! -f "./entwise-bootstrap-ca.crt" ]; then
-    echo "ERROR: entwise-bootstrap-ca.crt not found in repo — cannot proceed."
+if [ ! -f "${BOOTSTRAP_CA_FILE}" ]; then
+    echo "ERROR: entwise-bootstrap-ca.crt not found at ${BOOTSTRAP_CA_FILE} — cannot proceed."
     echo "This file must ship alongside install.sh, not be generated."
     exit 1
 fi
 
-cat entwise-bootstrap-ca.crt >> ca.crt
-echo "Canonical Entwise Bootstrap CA appended to ca.crt."
-
+BOOTSTRAP_FINGERPRINT=$(sed -n '2p' "${BOOTSTRAP_CA_FILE}")
+if grep -qF "${BOOTSTRAP_FINGERPRINT}" ca.crt 2>/dev/null; then
+    echo "Canonical Entwise Bootstrap CA already present in ca.crt — skipping append."
+else
+    cat "${BOOTSTRAP_CA_FILE}" >> ca.crt
+    echo "Canonical Entwise Bootstrap CA appended to ca.crt."
+fi
 sudo mkdir -p /etc/mosquitto/certs
 cd ~/certs
 sudo cp ca.crt broker.crt broker.key /etc/mosquitto/certs/
 sudo chown mosquitto: /etc/mosquitto/certs/*
-
+# Restart, always — never just "start" (a no-op against an
+# already-running service, which silently masked a fix earlier in
+# this project's history).
+sudo systemctl restart mosquitto
 # Make passwd
 echo "Generated MQTT credentials for this install."
 MQTT_USERNAME="entgen"
