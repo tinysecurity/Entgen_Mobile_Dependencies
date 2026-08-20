@@ -86,7 +86,7 @@ topic read entgen/bootstrap/+/ack
 # scoping (a device only touching its own topics) is a separate,
 # future hardening item, not part of this specific fix.
 pattern readwrite entgen/#
-pattern read $SYS/broker/uptime
+pattern read $SYS/#
 EOF
 
 echo "----------------ACL CONF ADDED-------------------------"
