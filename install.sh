@@ -291,6 +291,14 @@ with open('${HOME}/entgen_setup_payload.json', 'w') as f:
 "
 echo "-----------PAYLOAD GENERATED------------"
 echo "-----------PAYLOAD GENERATED------------"
+# After writing the new random password to /etc/mosquitto/passwd AND
+# /opt/entgen/mqtt_credentials.env — both entgen-ca-bootstrap and
+# entgen-enrollment loaded their credentials ONCE at process start.
+# A fresh password on disk means nothing to an already-running process
+# holding the old one in memory. Restart, always, same reasoning as
+# the Mosquitto restart-vs-reload fix from earlier.
+sudo systemctl restart entgen-ca-bootstrap
+sudo systemctl restart entgen-enrollment
 cp ${HOME}/entgen_setup_payload.json /opt/entgen/firmware/entgen_setup_payload.json
 qrencode -t ANSIUTF8 < ~/entgen_setup_payload.json
 sudo cp ~/entgen_setup_payload.json /opt/entgen/firmware/entgen_setup_payload.json
