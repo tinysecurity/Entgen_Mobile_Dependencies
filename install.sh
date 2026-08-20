@@ -117,6 +117,28 @@ sudo chmod 0700 /etc/mosquitto/acl.conf
 # referencing the repo file via its full path, with no `cd` away from
 # ~/certs required at all.
 # =============================================================================
+
+
+# =============================================================================
+# Step: Generate this deployment's own broker CA + cert (SAN-aware, IDEMPOTENT)
+#
+# FIX 3 — ca.crt serves TWO different roles that must not share content:
+#   ROLE A: Mosquitto's own cafile (client verification) — needs
+#           EntwiseBootstrapCA + every phone's delivered CA. Grows over
+#           time, by design.
+#   ROLE B: the QR payload's broker_ca field (phone's server verification
+#           of THIS broker) — needs ONLY the Pi's own EntgenCA, the one
+#           CA that actually signed broker.crt. Must NEVER grow — every
+#           extra byte here is pure QR-code bloat with zero purpose,
+#           since the phone has no reason to trust anything else in
+#           that field.
+#
+# Previously, both roles read from the SAME post-append ca.crt, so the
+# QR payload silently picked up EntwiseBootstrapCA too — doubling its
+# size for no functional reason and pushing it past reliable QR-scan
+# capacity. Fixed by snapshotting the Pi-only CA BEFORE the bootstrap
+# append happens, and using ONLY that snapshot for the JSON payload.
+# =============================================================================
 REPO_DIR=~/Entgen_Mobile_Dependencies
 CERT_DIR=/etc/mosquitto/certs
 
@@ -137,6 +159,11 @@ else
         -out ca.crt \
         -subj "/CN=EntgenCA/O=Entgen/C=US"
 fi
+
+# ── SNAPSHOT the Pi-only CA here, BEFORE anything else ever gets
+# appended to ca.crt. This is the ONLY thing that ever goes into the
+# QR payload's broker_ca field — never the post-append version.
+cp ca.crt pi_ca_only.crt
 
 openssl genrsa -out broker.key 2048
 openssl req -new \
@@ -163,13 +190,12 @@ openssl x509 -req -days 3650 \
     -out broker.crt \
     -extensions v3_req -extfile broker_ext.cnf
 
-# ── Canonical bootstrap CA — referenced by FULL PATH, no cd required,
-# no risk of appending to the wrong file. Still safely in ~/certs here.
+# ── From here on, ca.crt accumulates content meant ONLY for Mosquitto's
+# cafile (Role A) — pi_ca_only.crt (Role B) is untouched by any of this.
 BOOTSTRAP_CA_FILE="${REPO_DIR}/entwise-bootstrap-ca.crt"
 
 if [ ! -f "${BOOTSTRAP_CA_FILE}" ]; then
     echo "ERROR: entwise-bootstrap-ca.crt not found at ${BOOTSTRAP_CA_FILE} — cannot proceed."
-    echo "This file must ship alongside install.sh, not be generated."
     exit 1
 fi
 
@@ -180,13 +206,11 @@ else
     cat "${BOOTSTRAP_CA_FILE}" >> ca.crt
     echo "Canonical Entwise Bootstrap CA appended to ca.crt."
 fi
-sudo mkdir -p /etc/mosquitto/certs
-cd ~/certs
-sudo cp ca.crt broker.crt broker.key /etc/mosquitto/certs/
-sudo chown mosquitto: /etc/mosquitto/certs/*
-# Restart, always — never just "start" (a no-op against an
-# already-running service, which silently masked a fix earlier in
-# this project's history).
+
+sudo mkdir -p "${CERT_DIR}"
+sudo cp ca.crt broker.crt broker.key "${CERT_DIR}/"
+sudo chown mosquitto: "${CERT_DIR}"/*
+
 sudo systemctl restart mosquitto
 # Make passwd
 echo "Generated MQTT credentials for this install."
@@ -245,10 +269,14 @@ fi
 # Make payload for QR — built with Python's json module, not shell string
 # munging, so newlines inside the multi-line CA cert get properly escaped
 # as \n rather than landing as literal, JSON-breaking line breaks.
+
+# Make payload for QR — reads pi_ca_only.crt (the snapshot taken BEFORE
+# the bootstrap CA append), never the post-append ca.crt. This is the
+# actual fix for the oversized/wrong-content payload.
 python3 -c "
 import json
 
-with open('ca.crt') as f:
+with open('pi_ca_only.crt') as f:
     ca_pem = f.read()
 
 payload = {
@@ -261,6 +289,7 @@ payload = {
 with open('${HOME}/entgen_setup_payload.json', 'w') as f:
     json.dump(payload, f)
 "
+echo "-----------PAYLOAD GENERATED------------"
 echo "-----------PAYLOAD GENERATED------------"
 cp ${HOME}/entgen_setup_payload.json /opt/entgen/firmware/entgen_setup_payload.json
 qrencode -t ANSIUTF8 < ~/entgen_setup_payload.json
