@@ -133,6 +133,7 @@ openssl x509 -req -days 3650 \
     -CA ca.crt -CAkey ca.key -CAcreateserial \
     -out broker.crt \
     -extensions v3_req -extfile broker_ext.cnf
+
 cd ~/Entgen_Mobile_Dependencies
 
 if [ ! -f "./entwise-bootstrap-ca.crt" ]; then
@@ -170,6 +171,7 @@ sudo chown "${INSTALL_USER}:${INSTALL_USER}" /opt/entgen/mqtt_credentials.env
 sudo systemctl enable mosquitto
 sudo systemctl start mosquitto
 sudo systemctl status mosquitto --no-pager
+
 # Enable service
 sudo systemctl enable $BOOTSTRAP_SERVICE
 sudo systemctl enable $ENROLLMENT_SERVICE
@@ -179,7 +181,7 @@ sudo systemctl enable $FIRMWARE_SERVICE
 sudo systemctl start $BOOTSTRAP_SERVICE
 sudo systemctl start $ENROLLMENT_SERVICE
 sudo systemctl start $FIRMWARE_SERVICE
-
+sudo systemctl restart mosquitto 
 if systemctl -q is-active $BOOTSTRAP_SERVICE
 then
     echo "$BOOTSTRAP_SERVICE RUNNING!"
