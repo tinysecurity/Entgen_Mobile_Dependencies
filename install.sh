@@ -100,7 +100,7 @@ sudo chmod 0700 /etc/mosquitto/acl.conf
 # =============================================================================
 mkdir -p ~/certs && cd ~/certs
 
-PI_IP=$(hostname -I | awk '{print $1}')
+PI_IP=ip -4 addr show wlan0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}'
 echo "Detected Pi IP: ${PI_IP}"
 
 openssl genrsa -out ca.key 2048
