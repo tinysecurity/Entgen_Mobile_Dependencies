@@ -20,6 +20,9 @@ echo "Devices and firmware folders created"
 cd ~/Entgen_Mobile_Dependencies
 sudo cp save_ca_bootstrap.py /opt/entgen/save_ca_bootstrap.py
 sudo cp save_enrollment.py /opt/entgen/save_enrollment.py
+sudo cp BlinkCheck.ota /opt/entgen/firmware/BlinkCheck.ota
+sudo cp EntgenProduction_NO_ETH.ota /opt/entgen/firmware/EntgenProduction_NO_ETH.ota
+
 echo "Python scripts moved to entgen"
 # Move services to systemD 
 # entgen-firmware makes the web server to host the files
