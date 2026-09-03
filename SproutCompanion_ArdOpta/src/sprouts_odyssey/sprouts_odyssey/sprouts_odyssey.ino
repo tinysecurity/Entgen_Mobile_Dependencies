@@ -1508,31 +1508,6 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
 
   // -- State Machine -------------------------------------------
 
-  // Inventory and state flags, defined so they can be packed into one uint16
-  #define FLAG_HAS_CROOK            (1 << 0)
-  #define FLAG_HAS_BIRD             (1 << 1)
-  #define FLAG_PANEL_SOLVED         (1 << 2)
-  #define FLAG_GOLEM_DEFEATED       (1 << 3)
-  #define FLAG_RIDDLE_SOLVED        (1 << 4)
-  #define FLAG_CIPHER_SOLVED        (1 << 5)
-
-  // Room and State Identifiers
-
-  // RoomId groups states with a shared physical location.
-  enum RoomId {
-    ROOM_BEACH,
-    ROOM_FOREST_SPLIT
-  }
-
-  // StateId enumerates every distinct state the player can occupy.
-  // This enum's order MUST exactly match the STATES[] array
-  // defined below, as StateId is used as a direct index into that array in order to save memory.
-  enum StateId {
-    STATE_BEACH,
-    STATE_FOREST_SPLIT_STUB,
-    STATE_COUNT // sentinel, always last in the list, gives array size
-  }
-
   // Game State structure
 
   struct GameState {
@@ -1586,60 +1561,24 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
     return true
   }
 
-  // Beach State
+  bool crook_not_yet_taken(GameState* state) {
+    return !(state->flags & FLAG_HAS_CROOK);
+  }
 
-  const StateCommand beach_commands[] = {
-    { VERB_GO, TARGET_EAST, always_allowed, STATE_FOREST_SPLIT_STUB, NULL },
-  };
-  const uint8_t beach_commands_count = sizeof(beach_commands) / sizeof(beach_commands[0]);
+  bool crook_taken(GameState* state) {
+    return (state->flags & FLAG_HAS_CROOK);
+  }
 
-  const char* BEACH_DESCRIPTION = 
-    "Sprout wakes with his vegetable face pressed into the sand."
-    "He sits up, wipes the sandy crust off, and looks around."
-    "He is on a narrow, western-facing beach, a dense treeline"
-    "rising in the EAST.";
-
-  // Forest Split
-
-  const StateCommand forest_split_stub_commands[] = {
-    // intentionally empty for now -- no exits defined yet
-  };
-  const uint8_t forest_split_stub_commands_count = 0;
-
-  const char* FOREST_SPLIT_STUB_DESCRIPTION =
-    "You push through the treeline into the forest. (Placeholder -- "
-    "the real Forest Split description and exits go here.)";
-
-  // The state table
-  // Order MUST match the StateId enum above.
-   const State STATES[STATE_COUNT] = {
-    { ROOM_BEACH,       BEACH_DESCRIPTION,              beach_commands,               beach_commands_count},
-    { ROOM_FOREST_SPLIT FOREST_SPLIT_STUB_DESCRIPTION,  forest_split_stub_commands,   forest_split_stub_commands_count },
-  };
-
-  // Generic replies (constants)
-
-  const char* MSG_TOO_MANY        = "One thing at a time - try a single command.";
-  const char* MSG_UNRECOGNIZED    = "I don't understand that. Type HELP to get a list of valid commands.";
-  const char* MSG_NOT_HERE        = "That doesn't work here.";
-  const char* MSG_MISSIN_AUX      = "You don't have what you need to do that yet.";
-  const char* MSG_HELP            = 
-    "Commands: GO, USE, SLASH, DODGE, SAY, HELP, LOOK"
-    "Add a direction to GO like NORTH to move that direction."
-    "The USE commands picks up objects, uses objects in Sprout's"
-    "inventory, or interacts with an object in the room."
-    "SLASH launches an attack in a direction you enter in NumInput1."
-    "It hits if it finds a hole in the opponent's defense"
-    "DODGE negates an attack. Enter your defense in NumInput2."
-    "SAY is how Sprout speaks."
-    "HELP lists valid commands."
-    "LOOK tells you what Sprout sees in the current room.";
+  bool door_open(GameState* state) {
+    return (state->flags & FLAG_DOOR_OPENED);
+  }
   
   // Dispatcher
 
-  void handle_commadn(GameState* state, ParsedCommadn cmd) {
+  void handle_command(GameState* state, ParsedCommadn cmd) {
     if (cmd.too_many) {
       sproutSetOutputStr(MSG_TOO_MANY);
+      return;
     }
     
     if (cmd.verb == VERB_NONE) {
@@ -1678,6 +1617,21 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
       state->current_state = match->next_state;
       print_current_description(state);
     }
+  }
+
+  // State data extractors
+
+  const State* get_state(StateId id) {
+    return &STATES[id];
+  }
+
+  const StateCommand* find_matching_command(const State* state, Verb verb, Target target) {
+    for (uint8_t i = 0; i < state->command_count; i++) {
+      if (state->commands[i].verb == verb && state->commands[i].target == target) {
+        return &state->commands[i];
+      }
+    }
+    return NULL;
   }
 
   // Entry point for userLoop
@@ -1835,6 +1789,7 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
         cmd.target = t;
         continue;
       }
+    }
 
     return cmd;
   }
@@ -1943,3 +1898,222 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
       sproutSetOutputStr(GOLEM_MISS_TEXT);
     }
   }
+
+  // -- Game States and Descriptions ----------------------------
+
+  // Generic replies (constants)
+
+  const char* MSG_TOO_MANY        = "One thing at a time - try a single command.";
+  const char* MSG_UNRECOGNIZED    = "I don't understand that. Type HELP to get a list of valid commands.";
+  const char* MSG_NOT_HERE        = "That doesn't work here.";
+  const char* MSG_MISSING_AUX     = "You don't have what you need to do that yet.";
+  const char* MSG_HELP            = 
+    "Commands: GO, USE, SLASH, DODGE, SAY, HELP, LOOK"
+    "Add a direction to GO like NORTH to move that direction."
+    "The USE commands picks up objects, uses objects in Sprout's"
+    "inventory, or interacts with an object in the room."
+    "SLASH launches an attack in a direction you specify in NumInput1."
+    "Enter an integer 1 - 8 in NumInput1 to pick an attack direction."
+    "It hits if it finds a hole in the opponent's defense"
+    "DODGE negates an attack. Enter your defense in NumInput2."
+    "Enter an integer between 0 and 255 for your defense."
+    "SAY is how Sprout speaks."
+    "HELP lists valid commands."
+    "LOOK tells you what Sprout sees in the current room.";
+
+  // Inventory and state flags, defined so they can be packed into one uint16
+  #define FLAG_HAS_CROOK            (1 << 0)
+  #define FLAG_HAS_BIRD             (1 << 1)
+  #define FLAG_PANEL_SOLVED         (1 << 2)
+  #define FLAG_GOLEM_DEFEATED       (1 << 3)
+  #define FLAG_RIDDLE_SOLVED        (1 << 4)
+  #define FLAG_CIPHER_SOLVED        (1 << 5)
+  #define FLAG_DOOR_OPENED          (1 << 6)
+
+  // Room and State Identifiers
+
+  // RoomId groups states with a shared physical location.
+  enum RoomId {
+    ROOM_BEACH,
+    ROOM_FOREST,
+    ROOM_CLIFF,
+    ROOM_CAVE,
+    ROOM_MAZE_1,
+    ROOM_MAZE_2,
+    ROOM_MAZE_3,
+    ROOM_MAZE_4,
+    ROOM_MAZE_5,
+    ROOM_MAZE_6,
+    ROOM_MAZE_7,
+    ROOM_MAZE_8,
+    ROOM_MAZE_9
+  }
+
+  // StateId enumerates every distinct state the player can occupy.
+  // This enum's order MUST exactly match the STATES[] array
+  // defined below, as StateId is used as a direct index into that array in order to save memory.
+  enum StateId {
+    STATE_BEACH,
+    STATE_FOREST,
+    STATE_CLIFF,
+    STATE_CLIFF_EMPTY,
+    STATE_CAVE,
+    STATE_CAVE_EMPTY,
+    STATE_MAZE_1,
+    STATE_MAZE_2
+    STATE_MAZE_3,
+    STATE_MAZE_4,
+    STATE_MAZE_4_EMPTY,
+    STATE_MAZE_5,
+    STATE_MAZE_5_EMPTY,
+    STATE_MAZE_6,
+    STATE_MAZE_7,
+    STATE_MAZE_8,
+    STATE_MAZE_9,
+    STATE_MAZE_9_EMPTY,
+    STATE_MAZE_9_NO_BIRD,
+    STATE_END_LEAVE,
+    STATE_END_FRIENDS_SOLVE,
+    STATE_END_FRIENDS_BIRD,
+    STATE_COUNT // sentinel, always last in the list, gives array size
+  }
+
+  // The state table
+  // Order MUST match the StateId enum above.
+   const State STATES[STATE_COUNT] = {
+    { ROOM_BEACH,       BEACH_DESCRIPTION,              beach_commands,               beach_commands_count},
+    { ROOM_FOREST,      FOREST_DESCRIPTION,             forest_commands,              forest_commands_count },
+    { ROOM_CLIFF,       CLIFF_DESCRIPTION,              cliff_commands,               cliff_commands_count },
+    { ROOM_CLIFF,       CLIFF_EMPTY_DESCRIPTION,        cliff_empty_commands,         cliff_empty_commands_count },
+    { ROOM_CAVE,        CAVE_DESCRIPTION,               cave_commands,                cave_commands_count },
+    { ROOM_CAVE,        CAVE_EMPTY_DESCRIPTION,         cave_empty_commands,          cave_empty_commands_count },
+    { ROOM_MAZE_1,      MAZE_1_DESCRIPTION,             maze_1_commands,              maze_1_commands_count },
+    { ROOM_MAZE_2,      MAZE_2_DESCRIPTION,             maze_2_commands,              maze_2_commands_count },
+    { ROOM_MAZE_3,      MAZE_3_DESCRIPTION,             maze_3_commands,              maze_3_commands_count },
+    { ROOM_MAZE_4,      MAZE_4_DESCRIPTION,             maze_4_commands,              maze_4_commands_count },
+    { ROOM_MAZE_4,      MAZE_4_EMPTY_DESCRIPTION,       maze_4_empty_commands,        maze_4_empty_commands_count },
+    { ROOM_MAZE_5,      MAZE_5_DESCRIPTION,             maze_5_commands,              maze_5_commands_count },
+    { ROOM_MAZE_4,      MAZE_5_EMPTY_DESCRIPTION,       maze_5_empty_commands,        maze_5_empty_commands_count },
+    { ROOM_MAZE_6,      MAZE_6_DESCRIPTION,             maze_6_commands,              maze_6_commands_count },
+    { ROOM_MAZE_7,      MAZE_7_DESCRIPTION,             maze_7_commands,              maze_7_commands_count },
+    { ROOM_MAZE_8,      MAZE_8_DESCRIPTION,             maze_8_commands,              maze_8_commands_count },
+    { ROOM_MAZE_9,      MAZE_9_DESCRIPTION,             maze_9_commands,              maze_9_commands_count },
+    { ROOM_MAZE_9,      MAZE_9_EMPTY_DESCRIPTION,       maze_9_empty_commands,        maze_9_empty_commands_count },
+    { ROOM_MAZE_9,      MAZE_9_NO_BIRD_DESCRIPTION,     maze_9_no_bird_commands,      maze_9_no_bird_commands_count },
+    { ROOM_MAZE_8,      END_LEAVE_DESCRIPTION,          end_leave_commands,           end_leave_commands_count },
+    { ROOM_MAZE_8,      END_FRIENDS_SOLVE_DESCRIPTION,  end_friends_solve_commands,   end_friends_solve_commands_count },
+    { ROOM_MAZE_8,      END_FRIENDS_BIRD_DESCRIPTION,   end_friends_bird_commands,    end_friends_bird_commands_count },
+  };
+
+  // Beach State
+
+  const StateCommand beach_commands[] = {
+    { VERB_GO, TARGET_EAST, always_allowed, STATE_FOREST, NULL }
+  };
+  const uint8_t beach_commands_count = sizeof(beach_commands) / sizeof(beach_commands[0]);
+
+  const char* BEACH_DESCRIPTION = 
+    "Sprout wakes with his vegetable face pressed into the sand.\n"
+    "He sits up, wipes the sandy crust off, and looks around.\n"
+    "He is on a narrow, western-facing beach, a dense treeline\n"
+    "rising in the EAST.\n";
+
+  // Forest State
+
+  void cliff_handler(GameState* state);
+  void cave_handler(GameState* state);
+
+  const StateCommand forest_commands[] = {
+    { VERB_GO, TARGET_WEST, always_allowed, STATE_BEACH, NULL },
+    { VERB_GO, TARGET_NORTH, always_allowed, STATE_CLIFF, cliff_handler },
+    { VERB_GO, TARGET_EAST, always_allowed, STATE_CAVE, cave_handler }
+  };
+  const uint8_t forest_commands_count = sizeof(forest_commands) / sizeof(forest_commands[0]);
+
+  const char* FOREST_DESCRIPTION =
+    "You push through the treeline into the forest. (Placeholder)";
+
+  // Cliff State
+
+  void crook_handler(GameState* state);
+
+  const StateCommand cliff_commands[] = {
+    { VERB_GO, TARGET_SOUTH, always_allowed, STATE_FOREST, NULL },
+    { VERB_USE, TARGET_CROOK, crook_not_yet_taken, STATE_CLIFF, crook_handler }
+  };
+  const uint8_t cliff_commands_count = sizeof(cliff_commands) / sizeof(cliff_commands[0]);
+
+  const char* CLIFF_DESCRIPTION =
+    "Placeholder with a crook leaning against a boulder";
+  
+  const char* CROOK_COLLECTION_DESCRIPTION = 
+    "Placeholder description for Sprout picking up the Crook";
+  
+  void cliff_handler(GameState* state) {
+    if (state->flags & FLAG_HAS_CROOK) {
+      state->current_state = STATE_CLIFF_EMPTY;
+    } else {
+      state->current_state = STATE_CLIFF;
+    }
+    print_current_description(state);
+  }
+
+  void crook_handler(GameState* state) {
+    state->flags |= FLAG_HAS_CROOK;
+    state->current_state = STATE_CLIFF_EMPTY;
+    sproutSetOutputStr(CROOK_COLLECTION_DESCRIPTION);
+  }
+
+  // Cliff Empty State
+
+  const StateCommand cliff_empty_commands[] = {
+    { VERB_GO, TARGET_SOUTH, always_allowed, STATE_FOREST, NULL }
+  };
+  const uint8_t cliff_empty_commands_count = sizeof(cliff_empty_commands) / sizeof(cliff_empty_commands[0]);
+
+  const char* CLIFF_EMPTY_DESCRIPTION =
+    "Placeholder with no crook leaning against the boulder";
+
+  // Cave State
+
+  void lever_handler(GameState* state);
+
+  const StateCommand cave_commands[] = {
+    { VERB_GO, TARGET_WEST, always_allowed, STATE_FOREST, NULL },
+    { VERB_USE, TARGET_LEVER, crook_taken, STATE_CAVE, lever_handler }
+  };
+  const uint8_t cave_commands_count = sizeof(cave_commands) / sizeof(cave_commands[0]);
+
+  const char* CAVE_DESCRIPTION =
+    "Placeholder to describe cave with door closed";
+  
+  const char* DOOR_OPENING_DESCRIPTION = 
+    "Placeholder description for Sprout using the crook to open the door";
+
+  void cave_handler(GameState* state) {
+    if (state->flags & FLAG_DOOR_OPENED) {
+      state->current_state = STATE_CAVE_EMPTY;
+    } else {
+      state->current_state = STATE_CAVE;
+    }
+    print_current_description(state);
+  }
+
+  void lever_handler(GameState* state) {
+    state->flags |= FLAG_DOOR_OPENED;
+    state->current_state = STATE_CAVE_EMPTY;
+    sproutSetOutputStr(DOOR_OPENING_DESCRIPTION);
+  }
+
+  // Cave Empty State - the player has opened the door in the cave
+
+  const StateCommand cave_empty_commands[] = {
+    { VERB_GO, TARGET_WEST, always_allowed, STATE_FOREST, NULL },
+    { VERB_GO, TARGET_EAST, door_open, STATE_MAZE_4, NULL }
+  };
+  const uint8_t cave_empty_commands_count = sizeof(cave_tempty_commands) / sizeof(cave_empty_commands[0]);
+
+  const char* CAVE_EMPTY_DESCRIPTION =
+    "Placeholder to describe cave with door open";
+
+
