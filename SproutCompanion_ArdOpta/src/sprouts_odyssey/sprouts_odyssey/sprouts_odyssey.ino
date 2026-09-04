@@ -1520,7 +1520,7 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
     uint8_t     golem_attack_pattern;
   };
 
-  GameState game_state = { STATE_BEACH, 0, GOLEM_INACTIVE, 0, 0 };
+  GameState game_state = { STATE_BEACH, 0, COMBAT_INACTIVE, 0, 0 };
 
   // StateCommand / State
   //
@@ -1558,7 +1558,7 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
   // Condition helpers
 
   bool always_allowed(GameState* state) {
-    return true
+    return true;
   }
 
   bool crook_not_yet_taken(GameState* state) {
@@ -1572,10 +1572,50 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
   bool door_open(GameState* state) {
     return (state->flags & FLAG_DOOR_OPENED);
   }
+
+  bool panel_not_solved(GameState* state) {
+    return !(state->flags & FLAG_PANEL_SOLVED);
+  }
+
+  bool panel_solved(GameState* state) {
+    return (state->flags & FLAG_PANEL_SOLVED);
+  }
+
+  bool golem_not_defeated(GameState* state) {
+    return !(state->flags & FLAG_GOLEM_DEFEATED);
+  }
+
+  bool golem_defeated(GameState* state) {
+    return (state->flags & FLAG_GOLEM_DEFEATED);
+  }
+
+  bool riddle_not_solved(GameState* state) {
+    return !(state->flags & FLAG_RIDDLE_SOLVED);
+  }
+
+  bool riddle_solved(GameState* state) {
+    return (state->flags & FLAG_RIDDLE_SOLVED);
+  }
+
+  bool cipher_not_solved(GameState* state) {
+    return !(state->flags & FLAG_CIPHER_SOLVED);
+  }
+
+  bool cipher_solved(GameState* state) {
+    return (state->flags & FLAG_CIPHER_SOLVED);
+  }
+
+  bool golem_awaiting_defense(GameState* s) { 
+    return s->combat_phase == COMBAT_AWAITING_DEFENSE; 
+  }
+
+  bool golem_awaiting_attack(GameState* s)  { 
+    return s->combat_phase == COMBAT_AWAITING_ATTACK; 
+  }
   
   // Dispatcher
 
-  void handle_command(GameState* state, ParsedCommadn cmd) {
+  void handle_command(GameState* state, ParsedCommand cmd) {
     if (cmd.too_many) {
       sproutSetOutputStr(MSG_TOO_MANY);
       return;
@@ -1638,8 +1678,13 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
   // Call this once per loop pass to process any new user commands.
 
   void run_game_state_machine(GameState* state) {
+    if (awaiting_ack) {
+      handle_acknowledgement_wait(state);
+      return;
+    }
+    
     if (!sproutInputStrIsNew()) {
-      return
+      return;
     }
 
     ParsedCommand cmd = parse_input(sproutInputStr());
@@ -1680,7 +1725,7 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
     TARGET_PANEL,
     TARGET_BIRD,
     TARGET_CYCLOPS
-  }
+  };
 
     // Lookup tables - match strings to the enum vocabularies we previously defined
   struct VerbEntry {
@@ -1705,7 +1750,7 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
   const int VERB_TABLE_SIZE = sizeof(VERB_TABLE) / sizeof(VERB_TABLE[0]);
 
   const TargetEntry TARGET_TABLE[] = {
-    { "north",    TARGET_NORTH},
+    { "north",   TARGET_NORTH},
     { "south",   TARGET_SOUTH },
     { "east",    TARGET_EAST },
     { "west",    TARGET_WEST },
@@ -1763,7 +1808,7 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
     Verb verb;
     Target target;
     bool too_many;      // indicates that the user sent more than one verb or target, so command cannot be understood
-  }
+  };
 
   ParsedCommand parse_input(const char* input) {
     ParsedCommand cmd = { VERB_NONE, TARGET_NONE, false };
@@ -1794,13 +1839,54 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
     return cmd;
   }
 
-  
+  // -- Wait-for-Acknowledgement --------------------------------
+
+  typedef void (*AckCallback)(GameState*);
+
+  bool        awaiting_ack        = false;
+  AckCallback pending_ack_action  = NULL;
+
+  const char* MSG_WAITING_FOR_ACK = "Awaiting Acknowledgement. Press A to continue.";
+
+  void prompt_for_ack(const char* message, AckCallback continuation) {
+    char buffer[160];
+    snprintf(buffer, sizeof(buffer), "%s Press A to continue.", message);
+    sproutSetOutputStr(buffer);
+
+    // Clear stale Button1 press
+    sproutButton1Ack();
+
+    awaiting_ack        = true;
+    pending_ack_action  = continuation;
+  }
+
+  // Called every pass while awaiting_ack is true instead of normal command dispatch
+  void handle_acknowledgement_wait(GameState* state) {
+    if (sproutButton1IsNew()) {
+      sproutButton1Ack();
+      AckCallback continuation = pending_ack_action;
+      awaiting_ack        = false;
+      pending_ack_action  = NULL;
+      if (continuation != NULL) {
+        continuation(state);
+      } 
+      return;
+    }
+
+    // Ignore other inputs until the player acknowledges the pause
+    if (sproutButton2IsNew())   { sproutButton2Ack();   sproutSetOutputStr(MSG_WAITING_FOR_ACK); return; }
+    if (sproutInputNum1IsNew()) { sproutInputNum1Ack(); sproutSetOutputStr(MSG_WAITING_FOR_ACK); return; }
+    if (sproutInputNum2IsNew()) { sproutInputNum2Ack(); sproutSetOutputStr(MSG_WAITING_FOR_ACK); return; }
+    if (sproutInputStrIsNew())  { sproutInputStrAck();  sproutSetOutputStr(MSG_WAITING_FOR_ACK); return; }
+
+  }
+
   // -- Combat Function -----------------------------------------
 
   enum CombatPhase {
-    COMBAT_INACTIVE;          // Not yet engaged or already defeated
-    COMBAT_AWAITING_DEFENSE;  // waiting on DODGE
-    COMBAT_AWAITING_ATTACK;   // dodge succeeded, waiting on SLASH
+    COMBAT_INACTIVE,          // Not yet engaged or already defeated
+    COMBAT_AWAITING_DEFENSE,  // waiting on DODGE
+    COMBAT_AWAITING_ATTACK   // dodge succeeded, waiting on SLASH
   };
 
   const uint8_t GOLEM_DEFENSE_PATTERNS[3] = {
@@ -1820,13 +1906,19 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
     "The golem winds up for a sweeping blow from the left. Sprout reads the attack as a 90.",
     "The golem unleashes a flurry of blows in an uneven strike pattern. Sprout hastily recognizes a 53 attack pattern!",
     "The golem plants its feet, readying a heavy overhead slam. Sprout winces, knowing that the 226 attack hurts to parry...though it's worse to get hit."
-  }
+  };
 
   const char* GOLEM_ATTACK_FLAVOR[3] = {
     "The golem staggers, exposing itself low along its right side. The golem's vulnerability reads as 150 to Sprout's expert eye.",
     "The golem stumbles forward, frantically flailing to defend itself. In the chaos, Sprout spots opportunities all along 105.",
     "The golem's attack left it overextended, leaving its upper body wide open along lane 195."
-  }
+  };
+
+  const char* GOLEM_MISS_TEXT =
+    "Placeholder";
+
+  const char* GOLEM_HIT_TEXT = 
+    "Placeholder";
 
   // Bit check helpers
 
@@ -1838,7 +1930,7 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
   // Defense check: the player must submit the bitwise negation of the 
   // shown defense pattern. Returns true on a correct dodge.
   bool check_defense(uint8_t player_input, uint8_t defense_pattern) {
-    return player input == (uint8_t)(~defense_pattern);
+    return player_input == (uint8_t)(~defense_pattern);
   }
 
   // Attack check: player picks a direction 0-7. A hit lands if that bit
@@ -1847,9 +1939,30 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
     return ((attack_pattern >> direction) & 0x01) ==0;
   }
 
+  // Combat Acknowledgement continuation
+
+  void golem_knockback_continue(GameState* state) {
+    state->combat_phase = COMBAT_INACTIVE;
+    state->current_state = STATE_MAZE_4_EMPTY;
+    print_current_description(state);
+  }
+
+  void golem_miss_continue(GameState* state) {
+    state->combat_phase = COMBAT_AWAITING_DEFENSE;
+    uint8_t idx = pick_pattern_index();
+    state->golem_defense_pattern = GOLEM_DEFENSE_PATTERNS[idx];
+    sproutSetOutputStr(GOLEM_DEFENSE_FLAVOR[idx]);
+  }
+
+  void golem_victory_continue(GameState* state) {
+    state->combat_phase = COMBAT_INACTIVE;
+    state->current_state = STATE_MAZE_5_EMPTY;
+    print_current_description(state);
+  }
+
   // Golem combat initialization
   void start_golem_combat (GameState* state) {
-    state->golem_phase = GOLEM_AWAITING_DEFENSE;
+    state->combat_phase = COMBAT_AWAITING_DEFENSE;
     uint8_t idx = pick_pattern_index();
     state->golem_defense_pattern = GOLEM_DEFENSE_PATTERNS[idx];
 
@@ -1863,15 +1976,16 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
 
     if (check_defense(input, state->golem_defense_pattern)) {
       // Successful dodge - move to the attack phase
-      state->golem_phase = GOLEM_AWAITING_ATTACK;
+      state->combat_phase = COMBAT_AWAITING_ATTACK;
       uint8_t idx = pick_pattern_index();
       state->golem_attack_pattern = GOLEM_ATTACK_PATTERNS[idx];
       sproutSetOutputStr(GOLEM_ATTACK_FLAVOR[idx]);
     } else {
       // Failed dodge -- knockback to Maze Room 4, golem resets
-      state->golem_phase = GOLEM_INACTIVE;
-      state->current_state = MAZE_4;
-      sproutOutputStr("The blow connects and you're thrown back through the doorway.");
+      prompt_for_ack(
+        "The blow connects and you're thrown back through the doorway.",
+        golem_knockback_continue
+      );
     }
   }
 
@@ -1882,20 +1996,16 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
 
     if (direction > 7) {
       sproutSetOutputStr("That's not a direction you can strike.");
-      return; // Stays in GOLEM_AWAITING_ATTACK - doesn't cost the player a turn
+      return; // Stays in COMBAT_AWAITING_ATTACK - doesn't cost the player a turn
     }
 
     if (check_attack(direction, state->golem_attack_pattern)) {
       // Hit - golem defeated
-      state->golem_phase = GOLEM_INACTIVE;
       state->flags |= FLAG_GOLEM_DEFEATED;
-      sproutSetOutputStr(GOLEM_HIT_TEXT);
+      prompt_for_ack(GOLEM_HIT_TEXT, golem_victory_continue);
     } else {
       // Miss - the golem attacks again, back to a fresh defense pattern
-      state->golem_phase = GOLEM_AWAITING_DEFENSE;
-      uint8_t idx = pick_pattern_index();
-      state->golem_defense_pattern = GOLEM_DEFENSE_PATTERNS[idx];
-      sproutSetOutputStr(GOLEM_MISS_TEXT);
+      prompt_for_ack(GOLEM_MISS_TEXT, golem_miss_continue);
     }
   }
 
@@ -1947,7 +2057,7 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
     ROOM_MAZE_7,
     ROOM_MAZE_8,
     ROOM_MAZE_9
-  }
+  };
 
   // StateId enumerates every distinct state the player can occupy.
   // This enum's order MUST exactly match the STATES[] array
@@ -1960,7 +2070,7 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
     STATE_CAVE,
     STATE_CAVE_EMPTY,
     STATE_MAZE_1,
-    STATE_MAZE_2
+    STATE_MAZE_2,
     STATE_MAZE_3,
     STATE_MAZE_4,
     STATE_MAZE_4_EMPTY,
@@ -1976,33 +2086,6 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
     STATE_END_FRIENDS_SOLVE,
     STATE_END_FRIENDS_BIRD,
     STATE_COUNT // sentinel, always last in the list, gives array size
-  }
-
-  // The state table
-  // Order MUST match the StateId enum above.
-   const State STATES[STATE_COUNT] = {
-    { ROOM_BEACH,       BEACH_DESCRIPTION,              beach_commands,               beach_commands_count},
-    { ROOM_FOREST,      FOREST_DESCRIPTION,             forest_commands,              forest_commands_count },
-    { ROOM_CLIFF,       CLIFF_DESCRIPTION,              cliff_commands,               cliff_commands_count },
-    { ROOM_CLIFF,       CLIFF_EMPTY_DESCRIPTION,        cliff_empty_commands,         cliff_empty_commands_count },
-    { ROOM_CAVE,        CAVE_DESCRIPTION,               cave_commands,                cave_commands_count },
-    { ROOM_CAVE,        CAVE_EMPTY_DESCRIPTION,         cave_empty_commands,          cave_empty_commands_count },
-    { ROOM_MAZE_1,      MAZE_1_DESCRIPTION,             maze_1_commands,              maze_1_commands_count },
-    { ROOM_MAZE_2,      MAZE_2_DESCRIPTION,             maze_2_commands,              maze_2_commands_count },
-    { ROOM_MAZE_3,      MAZE_3_DESCRIPTION,             maze_3_commands,              maze_3_commands_count },
-    { ROOM_MAZE_4,      MAZE_4_DESCRIPTION,             maze_4_commands,              maze_4_commands_count },
-    { ROOM_MAZE_4,      MAZE_4_EMPTY_DESCRIPTION,       maze_4_empty_commands,        maze_4_empty_commands_count },
-    { ROOM_MAZE_5,      MAZE_5_DESCRIPTION,             maze_5_commands,              maze_5_commands_count },
-    { ROOM_MAZE_4,      MAZE_5_EMPTY_DESCRIPTION,       maze_5_empty_commands,        maze_5_empty_commands_count },
-    { ROOM_MAZE_6,      MAZE_6_DESCRIPTION,             maze_6_commands,              maze_6_commands_count },
-    { ROOM_MAZE_7,      MAZE_7_DESCRIPTION,             maze_7_commands,              maze_7_commands_count },
-    { ROOM_MAZE_8,      MAZE_8_DESCRIPTION,             maze_8_commands,              maze_8_commands_count },
-    { ROOM_MAZE_9,      MAZE_9_DESCRIPTION,             maze_9_commands,              maze_9_commands_count },
-    { ROOM_MAZE_9,      MAZE_9_EMPTY_DESCRIPTION,       maze_9_empty_commands,        maze_9_empty_commands_count },
-    { ROOM_MAZE_9,      MAZE_9_NO_BIRD_DESCRIPTION,     maze_9_no_bird_commands,      maze_9_no_bird_commands_count },
-    { ROOM_MAZE_8,      END_LEAVE_DESCRIPTION,          end_leave_commands,           end_leave_commands_count },
-    { ROOM_MAZE_8,      END_FRIENDS_SOLVE_DESCRIPTION,  end_friends_solve_commands,   end_friends_solve_commands_count },
-    { ROOM_MAZE_8,      END_FRIENDS_BIRD_DESCRIPTION,   end_friends_bird_commands,    end_friends_bird_commands_count },
   };
 
   // Beach State
@@ -2109,11 +2192,159 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
 
   const StateCommand cave_empty_commands[] = {
     { VERB_GO, TARGET_WEST, always_allowed, STATE_FOREST, NULL },
-    { VERB_GO, TARGET_EAST, door_open, STATE_MAZE_4, NULL }
+    { VERB_GO, TARGET_EAST, door_open, STATE_MAZE_4, maze_4_handler }
   };
-  const uint8_t cave_empty_commands_count = sizeof(cave_tempty_commands) / sizeof(cave_empty_commands[0]);
+  const uint8_t cave_empty_commands_count = sizeof(cave_empty_commands) / sizeof(cave_empty_commands[0]);
 
   const char* CAVE_EMPTY_DESCRIPTION =
     "Placeholder to describe cave with door open";
 
+  // Maze 1 State
 
+  const StateCommand maze_1_commands[] = {
+    { VERB_GO, TARGET_NORTH, always_allowed, STATE_MAZE_4, maze_4_handler },
+    { VERB_GO, TARGET_EAST, always_allowed, STATE_MAZE_2, NULL }
+  };
+  const uint8_t maze_1_commands_count = sizeof(maze_1_commands) / sizeof(maze_1_commands[0]);
+
+  const char* MAZE_1_DESCRIPTION = 
+    "Placeholder";
+
+  // Maze 2 State
+
+  const StateCommand maze_2_commands[] = {
+    { VERB_GO, TARGET_WEST, always_allowed, STATE_MAZE_1, NULL }
+  };
+  const uint8_t maze_2_commands_count = sizeof(maze_2_commands) / sizeof(maze_2_commands[0]);
+
+  const char* MAZE_2_DESCRIPTION = 
+    "Placeholder";
+  
+  // Maze 3 State
+
+  const StateCommand maze_3_commands[] = {
+    { VERB_GO, TARGET_NORTH, always_allowed, STATE_MAZE_6, NULL }
+  };
+  const uint8_t maze_3_commands_count = sizeof(maze_3_commands) / sizeof(maze_3_commands[0]);
+
+  const char* MAZE_3_DESCRIPTION = 
+    "Placeholder";
+  
+  // Maze 4 State
+
+  const StateCommand maze_4_commands[] = {
+    { VERB_GO, TARGET_WEST, door_open, STATE_CAVE, cave_handler },
+    { VERB_GO, TARGET_NORTH, always_allowed, STATE_MAZE_7, NULL },
+    { VERB_GO, TARGET_EAST, panel_solved, STATE_MAZE_5, maze_5_handler },
+    { VERB_GO, TARGET_SOUTH, always_allowed, STATE_MAZE_1, NULL },
+    { VERB_USE, TARGET_PANEL, panel_not_solved, STATE_MAZE_4_EMPTY, panel_handler }
+  };
+  const uint8_t maze_4_commands_count = sizeof(maze_4_commands) / sizeof(maze_4_commands[0]);
+
+  const char* MAZE_4_DESCRIPTION = 
+    "Placeholder";
+
+  const char* PANEL_SOLVED_DESCRIPTION =
+    "Placeholder";
+
+  const char* PANEL_WRONG_DESCRIPTION = 
+    "Placeholder";
+
+  void maze_4_handler(GameState* state) {
+    if (state->flags & FLAG_PANEL_SOLVED) {
+      state->current_state = STATE_MAZE_4_EMPTY;
+    } else {
+      state->current_state = STATE_MAZE_4;
+    }
+    print_current_description(state);
+  }
+
+  void panel_handler(GameState* state) {
+    float n1 = sproutInputNum1();
+    float n2 = sproutInputNum2();
+    sproutInputNum1Ack();
+    sproutInputNum2Ack();
+    bool correct = (n1 == 1 && n2 == 3) || (n1 == 3 && n2 == 1);
+
+    if (correct) {
+      state->flags |= FLAG_PANEL_SOLVED;
+      state->current_state = STATE_MAZE_4_EMPTY;
+      sproutSetOutputStr(PANEL_SOLVED_DESCRIPTION);
+    } else {
+      sproutSetOutputStr(PANEL_WRONG_DESCRIPTION);
+    }
+  }
+
+  // Maze 4 Empty State
+
+  const StateCommand maze_4_empty_commands[] = {
+    { VERB_GO, TARGET_WEST, door_open, STATE_CAVE, cave_handler },
+    { VERB_GO, TARGET_NORTH, always_allowed, STATE_MAZE_7, NULL },
+    { VERB_GO, TARGET_EAST, panel_solved, STATE_MAZE_5, maze_5_handler },
+    { VERB_GO, TARGET_SOUTH, always_allowed, STATE_MAZE_1, NULL }
+  };
+  const uint8_t maze_4_empty_commands_count = sizeof(maze_4_empty_commands) / sizeof(maze_4_empty_commands[0]);
+
+  const char* MAZE_4_EMPTY_DESCRIPTION = 
+    "Placeholder";
+
+  // Maze 5 State
+
+  const StateCommand maze_5_commands[] = {
+    { VERB_GO, TARGET_WEST, panel_solved, STATE_MAZE_4, maze_4_handler },
+    { VERB_GO, TARGET_EAST, golem_defeated, STATE_MAZE_6, NULL },
+    { VERB_DODGE, TARGET_NONE, golem_awaiting_defense, STATE_MAZE_5, cmd_golem_dodge },
+    { VERB_SLASH, TARGET_NONE, golem_awaiting_attack,  STATE_MAZE_5, cmd_golem_slash }
+  };
+  const uint8_t maze_5_commands_count = sizeof(maze_5_commands) / sizeof(maze_5_commands[0]);
+
+  const char* MAZE_5_DESCRIPTION = 
+    "Placeholder";
+
+  void maze_5_handler(GameState* state) {
+    if (state->flags & FLAG_GOLEM_DEFEATED) {
+      state->current_state = STATE_MAZE_5_EMPTY;
+      print_current_description(state);
+    } else {
+      state->current_state = STATE_MAZE_5;
+      start_golem_combat(state);
+    }
+  }
+
+  // Maze 5 Empty State
+
+  const StateCommand maze_5_empty_commands[] = {
+    { VERB_GO, TARGET_WEST, panel_solved, STATE_MAZE_4, maze_4_handler },
+    { VERB_GO, TARGET_EAST, golem_defeated, STATE_MAZE_6, NULL }
+  };
+  const uint8_t maze_5_empty_commands_count = sizeof(maze_5_empty_commands) / sizeof(maze_5_empty_commands[0]);
+
+  const char* MAZE_5_EMPTY_DESCRIPTION = 
+    "Placeholder";
+
+  // The state table
+  // Order MUST match the StateId enum above.
+   const State STATES[STATE_COUNT] = {
+    { ROOM_BEACH,       BEACH_DESCRIPTION,              beach_commands,               beach_commands_count},
+    { ROOM_FOREST,      FOREST_DESCRIPTION,             forest_commands,              forest_commands_count },
+    { ROOM_CLIFF,       CLIFF_DESCRIPTION,              cliff_commands,               cliff_commands_count },
+    { ROOM_CLIFF,       CLIFF_EMPTY_DESCRIPTION,        cliff_empty_commands,         cliff_empty_commands_count },
+    { ROOM_CAVE,        CAVE_DESCRIPTION,               cave_commands,                cave_commands_count },
+    { ROOM_CAVE,        CAVE_EMPTY_DESCRIPTION,         cave_empty_commands,          cave_empty_commands_count },
+    { ROOM_MAZE_1,      MAZE_1_DESCRIPTION,             maze_1_commands,              maze_1_commands_count },
+    { ROOM_MAZE_2,      MAZE_2_DESCRIPTION,             maze_2_commands,              maze_2_commands_count },
+    { ROOM_MAZE_3,      MAZE_3_DESCRIPTION,             maze_3_commands,              maze_3_commands_count },
+    { ROOM_MAZE_4,      MAZE_4_DESCRIPTION,             maze_4_commands,              maze_4_commands_count },
+    { ROOM_MAZE_4,      MAZE_4_EMPTY_DESCRIPTION,       maze_4_empty_commands,        maze_4_empty_commands_count },
+    { ROOM_MAZE_5,      MAZE_5_DESCRIPTION,             maze_5_commands,              maze_5_commands_count },
+    { ROOM_MAZE_5,      MAZE_5_EMPTY_DESCRIPTION,       maze_5_empty_commands,        maze_5_empty_commands_count },
+    { ROOM_MAZE_6,      MAZE_6_DESCRIPTION,             maze_6_commands,              maze_6_commands_count },
+    { ROOM_MAZE_7,      MAZE_7_DESCRIPTION,             maze_7_commands,              maze_7_commands_count },
+    { ROOM_MAZE_8,      MAZE_8_DESCRIPTION,             maze_8_commands,              maze_8_commands_count },
+    { ROOM_MAZE_9,      MAZE_9_DESCRIPTION,             maze_9_commands,              maze_9_commands_count },
+    { ROOM_MAZE_9,      MAZE_9_EMPTY_DESCRIPTION,       maze_9_empty_commands,        maze_9_empty_commands_count },
+    { ROOM_MAZE_9,      MAZE_9_NO_BIRD_DESCRIPTION,     maze_9_no_bird_commands,      maze_9_no_bird_commands_count },
+    { ROOM_MAZE_8,      END_LEAVE_DESCRIPTION,          end_leave_commands,           end_leave_commands_count },
+    { ROOM_MAZE_8,      END_FRIENDS_SOLVE_DESCRIPTION,  end_friends_solve_commands,   end_friends_solve_commands_count },
+    { ROOM_MAZE_8,      END_FRIENDS_BIRD_DESCRIPTION,   end_friends_bird_commands,    end_friends_bird_commands_count },
+  };
