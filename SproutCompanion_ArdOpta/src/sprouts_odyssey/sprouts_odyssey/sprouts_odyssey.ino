@@ -1545,7 +1545,7 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
     Target    target;
     bool      (*condition)(GameState*);
     StateId   next_state;                 // used only when handler == NULL
-    void      (*handler)(GameState*);     // NULL for simple transitions
+    void      (*handler)(GameState*, ParsedCommand);     // NULL for simple transitions
   };
 
   struct State {
@@ -1651,7 +1651,7 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
 
     if (match->handler != NULL) {
       // Handler owns the transition and the output text entirely.
-      match->handler(state);
+      match->handler(state, cmd);
     } else {
       // Simple transition -- move, then auto-print the new description.
       state->current_state = match->next_state;
@@ -1727,6 +1727,13 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
     TARGET_CYCLOPS
   };
 
+  enum Phrase {
+    PHRASE_NONE = 0,
+    PHRASE_MYLVUQ,
+    PHRASE_FRIEND,
+    PHRASE_BLUE
+  };
+
     // Lookup tables - match strings to the enum vocabularies we previously defined
   struct VerbEntry {
     const char* word;
@@ -1736,6 +1743,11 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
   struct TargetEntry {
     const char* word;
     Target target;
+  };
+
+  struct PhraseEntry {
+    const char* word;
+    Phrase phrase;
   };
 
   const VerbEntry VERB_TABLE[] = {
@@ -1761,6 +1773,13 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
     { "cyclops", TARGET_CYCLOPS }
   };
   const int TARGET_TABLE_SIZE = sizeof(TARGET_TABLE) / sizeof(TARGET_TABLE[0]);
+
+  const PhraseEntry PHRASE_TABLE[] = {
+    { "mylvuq",     PHRASE_MYLVUQ},
+    { "friend",     PHRASE_FRIEND},
+    { "blue",       PHRASE_BLUE}
+  };
+  const int PHRASE_TABLE_SIZE = sizeof(PHRASE_TABLE) / sizeof(PHRASE_TABLE[0]);
 
   // Tokenize - splits inputs into MAX_TOKENS lowercase words and returns number of tokens found
   int tokenize(const char* input, char tokens[MAX_TOKENS][MAX_TOKEN_LEN]) {
@@ -1803,15 +1822,25 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
     return TARGET_NONE;
   }
 
-  // Parse - passes over the tokens, classifies them into {verb, target} pairs.
+  Phrase lookup_phrase(const char* word) {
+    for (int i = 0; i < PHRASE_TABLE_SIZE; i++) {
+      if (strcmp(word, PHRASE_TABLE[i].word) == 0) {
+        return PHRASE_TABLE[i].phrase;
+      }
+    }
+    return PHRASE_NONE;
+  }
+
+  // Parse - passes over the tokens, classifies them into {verb, target, phrase} components.
   struct ParsedCommand {
     Verb verb;
     Target target;
-    bool too_many;      // indicates that the user sent more than one verb or target, so command cannot be understood
+    Phrase phrase;
+    bool too_many;      // indicates that the user sent more than one verb, target, or phrase, so command cannot be understood
   };
 
   ParsedCommand parse_input(const char* input) {
-    ParsedCommand cmd = { VERB_NONE, TARGET_NONE, false };
+    ParsedCommand cmd = { VERB_NONE, TARGET_NONE, PHRASE_NONE, false };
 
     char tokens[MAX_TOKENS][MAX_TOKEN_LEN];
     int token_count = tokenize(input, tokens);
@@ -1832,6 +1861,15 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
           cmd.too_many = true; // a second target showed up
         }
         cmd.target = t;
+        continue;
+      }
+
+      Phrase p = lookup_phrase(tokens[i]);
+      if (p != PHRASE_NONE) {
+        if (cmd.phrase != TARGET_NONE) {
+          cmd.too_many = true; // a second target showed up
+        }
+        cmd.phrase = p;
         continue;
       }
     }
@@ -2079,6 +2117,7 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
     STATE_MAZE_6,
     STATE_MAZE_7,
     STATE_MAZE_8,
+    STATE_MAZE_8_BIRD,
     STATE_MAZE_9,
     STATE_MAZE_9_EMPTY,
     STATE_MAZE_9_NO_BIRD,
@@ -2103,8 +2142,8 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
 
   // Forest State
 
-  void cliff_handler(GameState* state);
-  void cave_handler(GameState* state);
+  void cliff_handler(GameState* state, ParsedCommand cmd);
+  void cave_handler(GameState* state, ParsedCommand cmd);
 
   const StateCommand forest_commands[] = {
     { VERB_GO, TARGET_WEST, always_allowed, STATE_BEACH, NULL },
@@ -2118,7 +2157,7 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
 
   // Cliff State
 
-  void crook_handler(GameState* state);
+  void crook_handler(GameState* state, ParsedCommand cmd);
 
   const StateCommand cliff_commands[] = {
     { VERB_GO, TARGET_SOUTH, always_allowed, STATE_FOREST, NULL },
@@ -2132,7 +2171,7 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
   const char* CROOK_COLLECTION_DESCRIPTION = 
     "Placeholder description for Sprout picking up the Crook";
   
-  void cliff_handler(GameState* state) {
+  void cliff_handler(GameState* state, ParsedCommand cmd) {
     if (state->flags & FLAG_HAS_CROOK) {
       state->current_state = STATE_CLIFF_EMPTY;
     } else {
@@ -2141,10 +2180,18 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
     print_current_description(state);
   }
 
-  void crook_handler(GameState* state) {
+  // crook handler and continuations
+  
+  void crook_collected_continue(GameState* state) {
     state->flags |= FLAG_HAS_CROOK;
     state->current_state = STATE_CLIFF_EMPTY;
-    sproutSetOutputStr(CROOK_COLLECTION_DESCRIPTION);
+    print_current_description(state);
+  }
+
+  void crook_handler(GameState* state, ParsedCommand cmd) {
+    prompt_for_ack(
+      CROOK_COLLECTION_DESCRIPTION,
+      crook_collected_continue);
   }
 
   // Cliff Empty State
@@ -2159,7 +2206,7 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
 
   // Cave State
 
-  void lever_handler(GameState* state);
+  void lever_handler(GameState* state, ParsedCommand cmd);
 
   const StateCommand cave_commands[] = {
     { VERB_GO, TARGET_WEST, always_allowed, STATE_FOREST, NULL },
@@ -2173,7 +2220,7 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
   const char* DOOR_OPENING_DESCRIPTION = 
     "Placeholder description for Sprout using the crook to open the door";
 
-  void cave_handler(GameState* state) {
+  void cave_handler(GameState* state, ParsedCommand cmd) {
     if (state->flags & FLAG_DOOR_OPENED) {
       state->current_state = STATE_CAVE_EMPTY;
     } else {
@@ -2182,13 +2229,23 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
     print_current_description(state);
   }
 
-  void lever_handler(GameState* state) {
+  // lever handler and continuations
+  
+  void lever_solved_continue(GameState* state) {
     state->flags |= FLAG_DOOR_OPENED;
     state->current_state = STATE_CAVE_EMPTY;
-    sproutSetOutputStr(DOOR_OPENING_DESCRIPTION);
+    print_current_description(state);
+  }
+
+  void lever_handler(GameState* state, ParsedCommand cmd) {
+    prompt_for_ack(
+      DOOR_OPENING_DESCRIPTION,
+      lever_solved_continue);
   }
 
   // Cave Empty State - the player has opened the door in the cave
+
+  void maze_4_handler(GameState* state, ParsedCommand cmd);
 
   const StateCommand cave_empty_commands[] = {
     { VERB_GO, TARGET_WEST, always_allowed, STATE_FOREST, NULL },
@@ -2231,6 +2288,9 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
     "Placeholder";
   
   // Maze 4 State
+  
+  void maze_5_handler(GameState* state, ParsedCommand cmd);
+  void panel_handler(GameState* state, ParsedCommand cmd);
 
   const StateCommand maze_4_commands[] = {
     { VERB_GO, TARGET_WEST, door_open, STATE_CAVE, cave_handler },
@@ -2250,7 +2310,7 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
   const char* PANEL_WRONG_DESCRIPTION = 
     "Placeholder";
 
-  void maze_4_handler(GameState* state) {
+  void maze_4_handler(GameState* state, ParsedCommand cmd) {
     if (state->flags & FLAG_PANEL_SOLVED) {
       state->current_state = STATE_MAZE_4_EMPTY;
     } else {
@@ -2259,19 +2319,34 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
     print_current_description(state);
   }
 
-  void panel_handler(GameState* state) {
+  // panel handler and continuations
+  
+  void panel_solved_continue(GameState* state) {
+    state->flags |= FLAG_PANEL_SOLVED;
+    state->current_state = STATE_MAZE_4_EMPTY;
+    print_current_description(state);
+  }
+
+  void panel_not_solved_continue(GameState* state) {
+    state->current_state = STATE_MAZE_4;
+    print_current_description(state);
+  }
+
+  void panel_handler(GameState* state, ParsedCommand cmd) {
     float n1 = sproutInputNum1();
     float n2 = sproutInputNum2();
     sproutInputNum1Ack();
     sproutInputNum2Ack();
     bool correct = (n1 == 1 && n2 == 3) || (n1 == 3 && n2 == 1);
-
+    
     if (correct) {
-      state->flags |= FLAG_PANEL_SOLVED;
-      state->current_state = STATE_MAZE_4_EMPTY;
-      sproutSetOutputStr(PANEL_SOLVED_DESCRIPTION);
+      prompt_for_ack(
+        PANEL_SOLVED_DESCRIPTION,
+        panel_solved_continue);
     } else {
-      sproutSetOutputStr(PANEL_WRONG_DESCRIPTION);
+      prompt_for_ack(
+        PANEL_WRONG_DESCRIPTION,
+        panel_not_solved_continue);
     }
   }
 
@@ -2301,7 +2376,7 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
   const char* MAZE_5_DESCRIPTION = 
     "Placeholder";
 
-  void maze_5_handler(GameState* state) {
+  void maze_5_handler(GameState* state, ParsedCommand cmd) {
     if (state->flags & FLAG_GOLEM_DEFEATED) {
       state->current_state = STATE_MAZE_5_EMPTY;
       print_current_description(state);
@@ -2320,6 +2395,251 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
   const uint8_t maze_5_empty_commands_count = sizeof(maze_5_empty_commands) / sizeof(maze_5_empty_commands[0]);
 
   const char* MAZE_5_EMPTY_DESCRIPTION = 
+    "Placeholder";
+
+  // Maze 6 State
+
+  void maze_9_handler(GameState* state, ParsedCommand cmd);
+
+  const StateCommand maze_6_commands[] = {
+    { VERB_GO, TARGET_NORTH, always_allowed, STATE_MAZE_9, maze_9_handler },
+    { VERB_GO, TARGET_SOUTH, always_allowed, STATE_MAZE_3, NULL }
+  };
+  const uint8_t maze_6_commands_count = sizeof(maze_6_commands) / sizeof(maze_6_commands[0]);
+
+  const char* MAZE_6_DESCRIPTION = 
+    "Placeholder";
+
+  // Maze 7 State
+
+  const StateCommand maze_7_commands[] = {
+    { VERB_GO, TARGET_SOUTH, always_allowed, STATE_MAZE_4, maze_4_handler }
+  };
+  const uint8_t maze_7_commands_count = sizeof(maze_7_commands) / sizeof(maze_7_commands[0]);
+
+  const char* MAZE_7_DESCRIPTION = 
+    "Placeholder";
+
+  // Maze 8 State
+
+  void cipher_handler(GameState* state, ParsedCommand cmd);
+
+  const StateCommand maze_8_commands[] = {
+    { VERB_GO, TARGET_EAST, always_allowed, STATE_END_LEAVE, NULL },
+    { VERB_SAY, TARGET_CYCLOPS, always_allowed, STATE_END_FRIENDS_SOLVE, cipher_handler }
+  };
+  const uint8_t maze_8_commands_count = sizeof(maze_8_commands) / sizeof(maze_8_commands[0]);
+
+  const char* MAZE_8_DESCRIPTION = 
+    "Placeholder";
+
+  const char* INCORRECT_CIPHER = 
+    "Placeholder";
+
+  const char* CORRECT_CIPHER = 
+    "Placeholder";
+
+  void maze_8_handler(GameState* state, ParsedCommand cmd) {
+    if (state->flags & FLAG_HAS_BIRD) {
+      state->current_state = STATE_MAZE_8_BIRD;
+    } else {
+      state->current_state = STATE_MAZE_8;
+    }
+    print_current_description(state);
+  }
+
+  // cipher continuation and handler functions
+
+  void cipher_solved_continue(GameState* state) {
+    state->current_state = STATE_END_FRIENDS_SOLVE;
+    print_current_description(state);
+  }
+
+  void cipher_not_solved_continue(GameState* state) {
+    state->current_state = STATE_MAZE_8;
+    print_current_description(state);
+  }
+
+  void cipher_handler(GameState* state, ParsedCommand cmd) {
+    if (cmd.phrase == PHRASE_MYLVUQ) {
+      prompt_for_ack(
+        CORRECT_CIPHER,
+        cipher_solved_continue);
+    } else {
+      prompt_for_ack(
+        INCORRECT_CIPHER,
+        cipher_not_solved_continue);
+    }
+  }
+
+  // Maze 8 Bird State
+
+  void translation_handler(GameState* state, ParsedCommand cmd);
+
+  const StateCommand maze_8_bird_commands[] = {
+    { VERB_GO, TARGET_EAST, always_allowed, STATE_END_LEAVE, NULL },
+    { VERB_SAY, TARGET_CYCLOPS, always_allowed, STATE_END_FRIENDS_BIRD, translation_handler }
+  };
+  const uint8_t maze_8_bird_commands_count = sizeof(maze_8_bird_commands) / sizeof(maze_8_bird_commands[0]);
+
+  const char* MAZE_8_BIRD_DESCRIPTION = 
+    "Placeholder";
+
+  const char* INCORRECT_TRANSLATION = 
+    "Placeholder";
+
+  const char* CORRECT_TRANSLATION = 
+    "Placeholder";
+
+  // translation handler and continuations
+  
+  void translation_solved_continue(GameState* state) {
+    state->current_state = STATE_END_FRIENDS_BIRD;
+    print_current_description(state);
+  }
+
+  void translation_not_solved_continue(GameState* state) {
+    state->current_state = STATE_MAZE_8_BIRD;
+    print_current_description(state);
+  }
+
+  void translation_handler(GameState* state, ParsedCommand cmd) {
+    if (cmd.phrase == PHRASE_FRIEND) {
+      prompt_for_ack(
+        CORRECT_TRANSLATION,
+        translation_solved_continue);
+    } else {
+      prompt_for_ack(
+        INCORRECT_TRANSLATION,
+        translation_not_solved_continue);
+    }
+  }
+
+  // Maze 9 State
+
+  void riddle_handler(GameState* state, ParsedCommand cmd);
+
+  const StateCommand maze_9_commands[] = {
+    { VERB_GO, TARGET_SOUTH, always_allowed, STATE_MAZE_6, NULL },
+    { VERB_GO, TARGET_WEST, riddle_solved, STATE_MAZE_8, maze_8_handler },
+    { VERB_SAY, TARGET_BIRD, always_allowed, STATE_MAZE_9_EMPTY, riddle_handler }
+  };
+  const uint8_t maze_9_commands_count = sizeof(maze_9_commands) / sizeof(maze_9_commands[0]);
+
+  const char* MAZE_9_DESCRIPTION = 
+    "Placeholder";
+
+  void maze_9_handler(GameState* state, ParsedCommand cmd) {
+    if (state->flags & FLAG_RIDDLE_SOLVED) {
+      if (state->flags & FLAG_HAS_BIRD) {
+        state->current_state = STATE_MAZE_9_NO_BIRD;
+      } else {
+        state->current_state = STATE_MAZE_9_EMPTY;
+      }      
+    } else {
+      state->current_state = STATE_MAZE_9;
+    }
+    print_current_description(state);
+  }
+
+  const char* INCORRECT_RIDDLE = 
+    "Placeholder";
+
+  const char* CORRECT_RIDDLE = 
+    "Placeholder";
+
+  // riddle handler and continuations
+  
+  void riddle_solved_continue(GameState* state) {
+    state->current_state = STATE_MAZE_9_EMPTY;
+    print_current_description(state);
+  }
+
+  void riddle_not_solved_continue(GameState* state) {
+    state->current_state = STATE_MAZE_9;
+    print_current_description(state);
+  }
+
+  void riddle_handler(GameState* state, ParsedCommand cmd) {
+    if (cmd.phrase == PHRASE_BLUE) {
+      prompt_for_ack(
+        CORRECT_RIDDLE,
+        riddle_solved_continue);
+    } else {
+      prompt_for_ack(
+        INCORRECT_RIDDLE,
+        riddle_not_solved_continue);
+    }
+  }
+
+  // Maze 9 Empty State
+
+  const StateCommand maze_9_empty_commands[] = {
+    { VERB_GO, TARGET_SOUTH, always_allowed, STATE_MAZE_6, NULL },
+    { VERB_GO, TARGET_WEST, riddle_solved, STATE_MAZE_8, maze_8_handler },
+    { VERB_USE, TARGET_BIRD, always_allowed, STATE_MAZE_9_NO_BIRD, bird_handler }
+  };
+  const uint8_t maze_9_empty_commands_count = sizeof(maze_9_empty_commands) / sizeof(maze_9_empty_commands[0]);
+
+  const char* MAZE_9_EMPTY_DESCRIPTION = 
+    "Placeholder";
+
+  const char* COLLECT_BIRD = 
+    "Placeholder";
+
+  // riddle handler and continuations
+  
+  void bird_collected_continue(GameState* state) {
+    state->flags |= FLAG_HAS_BIRD;
+    state->current_state = STATE_MAZE_9_NO_BIRD;
+    print_current_description(state);
+  }
+
+  void bird_handler(GameState* state, ParsedCommand cmd) {
+    prompt_for_ack(
+      COLLECT_BIRD,
+      bird_collected_continue)
+  };
+
+  // Maze 9 No Bird State
+
+  const StateCommand maze_9_no_bird_commands[] = {
+    { VERB_GO, TARGET_SOUTH, always_allowed, STATE_MAZE_6, NULL },
+    { VERB_GO, TARGET_WEST, riddle_solved, STATE_MAZE_8, maze_8_handler }
+  };
+  const uint8_t maze_9_no_bird_commands_count = sizeof(maze_9_no_bird_commands) / sizeof(maze_9_no_bird_commands[0]);
+
+  const char* MAZE_9_NO_BIRD_DESCRIPTION = 
+    "Placeholder";
+  
+  // End Leave State
+
+  const StateCommand end_leave_commands[] = {
+    { VERB_GO, TARGET_EAST, always_allowed, STATE_MAZE_8, maze_8_handler }
+  };
+  const uint8_t end_leave_commands_count = sizeof(end_leave_commands) / sizeof(end_leave_commands[0]);
+
+  const char* END_LEAVE_DESCRIPTION = 
+    "Placeholder";
+
+  // End Friends Solve State
+
+  const StateCommand end_friends_solve_commands[] = {
+    { VERB_GO, TARGET_EAST, always_allowed, STATE_MAZE_8, maze_8_handler }
+  };
+  const uint8_t end_friends_solve_commands_count = sizeof(end_friends_solve_commands) / sizeof(end_friends_solve_commands[0]);
+
+  const char* END_FRIENDS_SOLVE_DESCRIPTION = 
+    "Placeholder";
+
+  // End Friends Bird State
+
+  const StateCommand end_friends_bird_commands[] = {
+    { VERB_GO, TARGET_EAST, always_allowed, STATE_MAZE_8, maze_8_handler }
+  };
+  const uint8_t end_friends_bird_commands_count = sizeof(end_friends_bird_commands) / sizeof(end_friends_bird_commands[0]);
+
+  const char* END_FRIENDS_BIRD_DESCRIPTION = 
     "Placeholder";
 
   // The state table
@@ -2341,6 +2661,7 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
     { ROOM_MAZE_6,      MAZE_6_DESCRIPTION,             maze_6_commands,              maze_6_commands_count },
     { ROOM_MAZE_7,      MAZE_7_DESCRIPTION,             maze_7_commands,              maze_7_commands_count },
     { ROOM_MAZE_8,      MAZE_8_DESCRIPTION,             maze_8_commands,              maze_8_commands_count },
+    { ROOM_MAZE_8,      MAZE_8_BIRD_DESCRIPTION,        maze_8_bird_commands,         maze_8_bird_commands_count },
     { ROOM_MAZE_9,      MAZE_9_DESCRIPTION,             maze_9_commands,              maze_9_commands_count },
     { ROOM_MAZE_9,      MAZE_9_EMPTY_DESCRIPTION,       maze_9_empty_commands,        maze_9_empty_commands_count },
     { ROOM_MAZE_9,      MAZE_9_NO_BIRD_DESCRIPTION,     maze_9_no_bird_commands,      maze_9_no_bird_commands_count },
