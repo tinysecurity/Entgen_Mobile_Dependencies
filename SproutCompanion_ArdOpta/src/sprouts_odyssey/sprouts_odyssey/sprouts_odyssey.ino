@@ -1514,10 +1514,10 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
     StateId     current_state;
     uint16_t    flags;
 
-    // Golem combat states
+    // Sheep combat states
     CombatPhase combat_phase;
-    uint8_t     golem_defense_pattern;
-    uint8_t     golem_attack_pattern;
+    uint8_t     sheep_defense_pattern;
+    uint8_t     sheep_attack_pattern;
   };
 
   GameState game_state = { STATE_BEACH, 0, COMBAT_INACTIVE, 0, 0 };
@@ -1581,12 +1581,12 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
     return (state->flags & FLAG_PANEL_SOLVED);
   }
 
-  bool golem_not_defeated(GameState* state) {
-    return !(state->flags & FLAG_GOLEM_DEFEATED);
+  bool sheep_not_defeated(GameState* state) {
+    return !(state->flags & FLAG_SHEEP_DEFEATED);
   }
 
-  bool golem_defeated(GameState* state) {
-    return (state->flags & FLAG_GOLEM_DEFEATED);
+  bool sheep_defeated(GameState* state) {
+    return (state->flags & FLAG_SHEEP_DEFEATED);
   }
 
   bool riddle_not_solved(GameState* state) {
@@ -1605,11 +1605,11 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
     return (state->flags & FLAG_CIPHER_SOLVED);
   }
 
-  bool golem_awaiting_defense(GameState* s) { 
+  bool sheep_awaiting_defense(GameState* s) { 
     return s->combat_phase == COMBAT_AWAITING_DEFENSE; 
   }
 
-  bool golem_awaiting_attack(GameState* s)  { 
+  bool sheep_awaiting_attack(GameState* s)  { 
     return s->combat_phase == COMBAT_AWAITING_ATTACK; 
   }
   
@@ -1927,40 +1927,50 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
     COMBAT_AWAITING_ATTACK   // dodge succeeded, waiting on SLASH
   };
 
-  const uint8_t GOLEM_DEFENSE_PATTERNS[3] = {
+  const uint8_t SHEEP_DEFENSE_PATTERNS[3] = {
     90,
     53,
     226
   };
 
-  const uint8_t GOLEM_ATTACK_PATTERNS[3] = {
+  const uint8_t SHEEP_ATTACK_PATTERNS[3] = {
     150,
     105,
     195
   };
 
-  // Golem fight flavor text
-  const char* GOLEM_DEFENSE_FLAVOR[3] = {
-    "The golem winds up for a sweeping blow from the left. Sprout reads the attack as a 90.",
-    "The golem unleashes a flurry of blows in an uneven strike pattern. Sprout hastily recognizes a 53 attack pattern!",
-    "The golem plants its feet, readying a heavy overhead slam. Sprout winces, knowing that the 226 attack hurts to parry...though it's worse to get hit."
+  // Sheep fight flavor text
+  const char* SHEEP_DEFENSE_FLAVOR[3] = {
+    "The sheep darts in to nip at Sprout from the left.\n"
+    "Sprout reads the attack as a 90.\n",
+    "The sheep snaps at Sprout in an uneven strike pattern.\n" 
+    "Sprout hastily recognizes attack 53!\n",
+    "The sheep rears, readying a heavy overhead slam.\n"
+    "Sprout winces, knowing that the 226 attack hurts to parry...\n"
+    "though it's worse to get hit.\n"
   };
 
-  const char* GOLEM_ATTACK_FLAVOR[3] = {
-    "The golem staggers, exposing itself low along its right side. The golem's vulnerability reads as 150 to Sprout's expert eye.",
-    "The golem stumbles forward, frantically flailing to defend itself. In the chaos, Sprout spots opportunities all along 105.",
-    "The golem's attack left it overextended, leaving its upper body wide open along lane 195."
+  const char* SHEEP_ATTACK_FLAVOR[3] = {
+    "The sheep staggers, exposing itself low along its right side.\n"
+    "The sheep's vulnerability reads as 150 to Sprout's expert eye.",
+    "The sheep stumbles forward, frantically flailing to keep its feet.\n" 
+    "In the chaos, Sprout spots opportunities all along 105.\n",
+    "The sheep's attack left it overextended,\n"
+    "leaving its upper body wide open along lane 195.\n"
   };
 
-  const char* GOLEM_MISS_TEXT =
-    "Placeholder";
+  const char* SHEEP_MISS_TEXT =
+    "Sprout's blow just bounces off the sheep's fluffy wool.\n"
+    "It seems to be unaffected.\n";
 
-  const char* GOLEM_HIT_TEXT = 
-    "Placeholder";
+  const char* SHEEP_HIT_TEXT = 
+    "Sprout smacks the sheep firmly on the nose with the CROOK.\n"
+    "The sheep pauses, stunned. It then lets out an apologetic bleat\n"
+    "and steps out of Sprout's way.";
 
   // Bit check helpers
 
-  // Random number generator to select the golem's attacks and defenses
+  // Random number generator to select the sheep's attacks and defenses
   uint8_t pick_pattern_index() {
     return random(0, 3);
   }
@@ -1979,56 +1989,57 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
 
   // Combat Acknowledgement continuation
 
-  void golem_knockback_continue(GameState* state) {
+  void sheep_knockback_continue(GameState* state) {
     state->combat_phase = COMBAT_INACTIVE;
     state->current_state = STATE_MAZE_4_EMPTY;
     print_current_description(state);
   }
 
-  void golem_miss_continue(GameState* state) {
+  void sheep_miss_continue(GameState* state) {
     state->combat_phase = COMBAT_AWAITING_DEFENSE;
     uint8_t idx = pick_pattern_index();
-    state->golem_defense_pattern = GOLEM_DEFENSE_PATTERNS[idx];
-    sproutSetOutputStr(GOLEM_DEFENSE_FLAVOR[idx]);
+    state->sheep_defense_pattern = SHEEP_DEFENSE_PATTERNS[idx];
+    sproutSetOutputStr(SHEEP_DEFENSE_FLAVOR[idx]);
   }
 
-  void golem_victory_continue(GameState* state) {
+  void sheep_victory_continue(GameState* state) {
     state->combat_phase = COMBAT_INACTIVE;
     state->current_state = STATE_MAZE_5_EMPTY;
     print_current_description(state);
   }
 
-  // Golem combat initialization
-  void start_golem_combat (GameState* state) {
+  // Sheep combat initialization
+  void start_sheep_combat (GameState* state) {
     state->combat_phase = COMBAT_AWAITING_DEFENSE;
     uint8_t idx = pick_pattern_index();
-    state->golem_defense_pattern = GOLEM_DEFENSE_PATTERNS[idx];
+    state->sheep_defense_pattern = SHEEP_DEFENSE_PATTERNS[idx];
 
-    sproutSetOutputStr(GOLEM_DEFENSE_FLAVOR[idx]);
+    sproutSetOutputStr(SHEEP_DEFENSE_FLAVOR[idx]);
   }
 
   // DODGE command handler
-  void cmd_golem_dodge(GameState* state) {
+  void cmd_sheep_dodge(GameState* state) {
     uint8_t input = (uint8_t)sproutInputNum1();
     sproutInputNum1Ack();
 
-    if (check_defense(input, state->golem_defense_pattern)) {
+    if (check_defense(input, state->sheep_defense_pattern)) {
       // Successful dodge - move to the attack phase
       state->combat_phase = COMBAT_AWAITING_ATTACK;
       uint8_t idx = pick_pattern_index();
-      state->golem_attack_pattern = GOLEM_ATTACK_PATTERNS[idx];
-      sproutSetOutputStr(GOLEM_ATTACK_FLAVOR[idx]);
+      state->sheep_attack_pattern = SHEEP_ATTACK_PATTERNS[idx];
+      sproutSetOutputStr(SHEEP_ATTACK_FLAVOR[idx]);
     } else {
-      // Failed dodge -- knockback to Maze Room 4, golem resets
+      // Failed dodge -- knockback to Maze Room 4, sheep resets
       prompt_for_ack(
-        "The blow connects and you're thrown back through the doorway.",
-        golem_knockback_continue
+        "Sprout barely dodges the sheep's teeth and\n"
+        "flees back to the safety of the entryway.\n",
+        sheep_knockback_continue
       );
     }
   }
 
   // SLASH command handler
-  void cmd_golem_slash(GameState* state) {
+  void cmd_sheep_slash(GameState* state) {
     uint8_t direction = (uint8_t)sproutInputNum1();
     sproutInputNum1Ack();
 
@@ -2037,13 +2048,13 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
       return; // Stays in COMBAT_AWAITING_ATTACK - doesn't cost the player a turn
     }
 
-    if (check_attack(direction, state->golem_attack_pattern)) {
-      // Hit - golem defeated
-      state->flags |= FLAG_GOLEM_DEFEATED;
-      prompt_for_ack(GOLEM_HIT_TEXT, golem_victory_continue);
+    if (check_attack(direction, state->sheep_attack_pattern)) {
+      // Hit - sheep defeated
+      state->flags |= FLAG_SHEEP_DEFEATED;
+      prompt_for_ack(SHEEP_HIT_TEXT, sheep_victory_continue);
     } else {
-      // Miss - the golem attacks again, back to a fresh defense pattern
-      prompt_for_ack(GOLEM_MISS_TEXT, golem_miss_continue);
+      // Miss - the sheep attacks again, back to a fresh defense pattern
+      prompt_for_ack(SHEEP_MISS_TEXT, sheep_miss_continue);
     }
   }
 
@@ -2051,29 +2062,27 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
 
   // Generic replies (constants)
 
-  const char* MSG_TOO_MANY        = "One thing at a time - try a single command.";
-  const char* MSG_UNRECOGNIZED    = "I don't understand that. Type HELP to get a list of valid commands.";
-  const char* MSG_NOT_HERE        = "That doesn't work here.";
-  const char* MSG_MISSING_AUX     = "You don't have what you need to do that yet.";
+  const char* MSG_TOO_MANY        = "One thing at a time - try a single command.\n";
+  const char* MSG_UNRECOGNIZED    = "I don't understand that. Type HELP to get a list of valid commands.\n";
+  const char* MSG_NOT_HERE        = "That doesn't work here.\n";
+  const char* MSG_MISSING_AUX     = "You don't have what you need to do that yet.\n";
   const char* MSG_HELP            = 
-    "Commands: GO, USE, SLASH, DODGE, SAY, HELP, LOOK"
-    "Add a direction to GO like NORTH to move that direction."
-    "The USE commands picks up objects, uses objects in Sprout's"
-    "inventory, or interacts with an object in the room."
-    "SLASH launches an attack in a direction you specify in NumInput1."
-    "Enter an integer 1 - 8 in NumInput1 to pick an attack direction."
-    "It hits if it finds a hole in the opponent's defense"
-    "DODGE negates an attack. Enter your defense in NumInput2."
-    "Enter an integer between 0 and 255 for your defense."
-    "SAY is how Sprout speaks."
-    "HELP lists valid commands."
-    "LOOK tells you what Sprout sees in the current room.";
+    "Commands: GO, USE, SLASH, DODGE, SAY, HELP, LOOK\n"
+    "Add a direction to GO like NORTH to move that direction.\n"
+    "The USE commands picks up or interacts with objects in the room.\n"
+    "SLASH to attack, hitting if you find a hole in the defense.\n"
+    "Enter an integer 0 - 7 in NumInput1 to pick an attack direction.\n"
+    "DODGE negates an attack. Enter your defense in NumInput2.\n"
+    "Enter an integer between 0 and 255.\n"
+    "SAY is how Sprout speaks. Specify to whom he speaks.\n"
+    "HELP lists valid commands.\n"
+    "LOOK tells you what Sprout sees in the current room.\n";
 
   // Inventory and state flags, defined so they can be packed into one uint16
   #define FLAG_HAS_CROOK            (1 << 0)
   #define FLAG_HAS_BIRD             (1 << 1)
   #define FLAG_PANEL_SOLVED         (1 << 2)
-  #define FLAG_GOLEM_DEFEATED       (1 << 3)
+  #define FLAG_SHEEP_DEFEATED       (1 << 3)
   #define FLAG_RIDDLE_SOLVED        (1 << 4)
   #define FLAG_CIPHER_SOLVED        (1 << 5)
   #define FLAG_DOOR_OPENED          (1 << 6)
@@ -2135,10 +2144,13 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
   const uint8_t beach_commands_count = sizeof(beach_commands) / sizeof(beach_commands[0]);
 
   const char* BEACH_DESCRIPTION = 
-    "Sprout wakes with his vegetable face pressed into the sand.\n"
-    "He sits up, wipes the sandy crust off, and looks around.\n"
-    "He is on a narrow, western-facing beach, a dense treeline\n"
-    "rising in the EAST.\n";
+    "Sprout finds himself on a sandy beach.\n"
+    "His boat rests in the shallows where he had tied it in place.\n"
+    "The sails are tattered and there are cracks in the timbers.\n"
+    "He needs to find materials to fix the craft, and some rich\n"
+    "soil and fresh water to feed himself.\n"
+    "He looks at the forest rising in the EAST.\n"
+    "Perhaps he can find supplies there?\n";
 
   // Forest State
 
@@ -2153,7 +2165,13 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
   const uint8_t forest_commands_count = sizeof(forest_commands) / sizeof(forest_commands[0]);
 
   const char* FOREST_DESCRIPTION =
-    "You push through the treeline into the forest. (Placeholder)";
+    "Sprout pauses in the forest where the path splits.\n"
+    "He paushes to catch his breath. The path had been steep.\n"
+    "He idly considers what kind of creature had left this trail.\n"
+    "To the WEST, the trail drops down to the sandy beach.\n"
+    "To the EAST, it continues up the mountain side.\n"
+    "The path splits to the NORTH, rising more gently towards a gap\n"
+    "in the canopy.\n";
 
   // Cliff State
 
@@ -2166,10 +2184,20 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
   const uint8_t cliff_commands_count = sizeof(cliff_commands) / sizeof(cliff_commands[0]);
 
   const char* CLIFF_DESCRIPTION =
-    "Placeholder with a crook leaning against a boulder";
+    "Sprout emerges from the forest into a grassy meadow\n"
+    "at the top of a cliff overlooking the sea.\n"
+    "Wind rustles the grass, cooling his vegetable skin.\n"
+    "There is a large boulder in the middle of the meadow.\n"
+    "Strangely, a long CROOK, taller than Sprout himself,\n"
+    "rests against it. Apparently someone lives here!\n"
+    "Sprout glances at the forest to the SOUTH,\n"
+    "speculating about who it might be.\n";
   
   const char* CROOK_COLLECTION_DESCRIPTION = 
-    "Placeholder description for Sprout picking up the Crook";
+    "Sprout hefts the CROOK. It's a bit awkward to carry,\n"
+    "but he's sure it will come in handy.\n"
+    "He finally manages to settle it against one shoulder.\n"
+    "It will be comfortable enough there.\n";
   
   void cliff_handler(GameState* state, ParsedCommand cmd) {
     if (state->flags & FLAG_HAS_CROOK) {
@@ -2202,7 +2230,10 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
   const uint8_t cliff_empty_commands_count = sizeof(cliff_empty_commands) / sizeof(cliff_empty_commands[0]);
 
   const char* CLIFF_EMPTY_DESCRIPTION =
-    "Placeholder with no crook leaning against the boulder";
+    "Sprout sits on the boulder in the clearing overlooking the sea.\n"
+    "It feels good to rest and enjoy the beauty of the sky.\n"
+    "After a few minutes he looks back to the forest in the SOUTH.\n"
+    "He should be getting on with his adventure.\n";
 
   // Cave State
 
@@ -2215,10 +2246,18 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
   const uint8_t cave_commands_count = sizeof(cave_commands) / sizeof(cave_commands[0]);
 
   const char* CAVE_DESCRIPTION =
-    "Placeholder to describe cave with door closed";
+    "Sprout enters a cave. Not a nasty, dripping cave,\n"
+    "but a homely one, with piles of grass in the corners\n"
+    "where some creature had clearly been laying down.\n"
+    "Light filters in from the entrance to the forest in the WEST.\n"
+    "To the EAST a large door is set into the back of the cave.\n"
+    "There is a LEVER next to the door, high out of Sprout's reach.\n";
   
   const char* DOOR_OPENING_DESCRIPTION = 
-    "Placeholder description for Sprout using the crook to open the door";
+    "Sprout holds the CROOK at one end and reeeaches for the LEVER.\n"
+    "After a couple of failed attempts, he manages to hook it.\n"
+    "With a mighty tug, he pulls the lever down!\n"
+    "There is a click, and the door swings open.\n";
 
   void cave_handler(GameState* state, ParsedCommand cmd) {
     if (state->flags & FLAG_DOOR_OPENED) {
@@ -2254,7 +2293,10 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
   const uint8_t cave_empty_commands_count = sizeof(cave_empty_commands) / sizeof(cave_empty_commands[0]);
 
   const char* CAVE_EMPTY_DESCRIPTION =
-    "Placeholder to describe cave with door open";
+    "Torchlight flickers from the door in the EAST wall of the cave.\n"
+    "Daylight filters in from the entrance in the WEST.\n"
+    "Whomever lives here must live inside the mountain!\n"
+    "Sprout tingles with excitement to meet them.\n";
 
   // Maze 1 State
 
@@ -2265,7 +2307,10 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
   const uint8_t maze_1_commands_count = sizeof(maze_1_commands) / sizeof(maze_1_commands[0]);
 
   const char* MAZE_1_DESCRIPTION = 
-    "Placeholder";
+    "A large stove dominates this room,\n"
+    "connected to a natural chimney in the rock."
+    "A corridor slopes gently up to the NORTH,\n"
+    "and there is a drop-off into a pool of water to the EAST.\n";
 
   // Maze 2 State
 
@@ -2275,7 +2320,10 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
   const uint8_t maze_2_commands_count = sizeof(maze_2_commands) / sizeof(maze_2_commands[0]);
 
   const char* MAZE_2_DESCRIPTION = 
-    "Placeholder";
+    "Sprout dangles his root-feet into the pool and drinks deeply.\n"
+    "Ah, so refreshing!\n"
+    "Satisfied, he rises and turns back towards the kitchen\n"
+    "in the WEST.\n";
   
   // Maze 3 State
 
@@ -2285,7 +2333,11 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
   const uint8_t maze_3_commands_count = sizeof(maze_3_commands) / sizeof(maze_3_commands[0]);
 
   const char* MAZE_3_DESCRIPTION = 
-    "Placeholder";
+    "This room is painted in the blue colors of the sea and skies.\n"
+    "White puffy clouds float above the water.\n"
+    "The waves sparkle with glints of silver at their crests.\n"
+    "Seagulls are painted in places where the painter made a mistake.\n"
+    "The only exit is a door to the NORTH.";
   
   // Maze 4 State
   
@@ -2302,13 +2354,27 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
   const uint8_t maze_4_commands_count = sizeof(maze_4_commands) / sizeof(maze_4_commands[0]);
 
   const char* MAZE_4_DESCRIPTION = 
-    "Placeholder";
+    "The entryway has three exits:\n"
+    "the door back to the cave in the WEST,\n"
+    "a corridor sloping gently SOUTH,\n"
+    "and an arch to another room in the NORTH.\n"
+    "The wall in the EAST has a puzzle on a clay PANEL.\n"
+    "If 4 is 2 and 1 and 12 is 3 and 2 and 1, what is 27?\n"
+    "Enter our answer in NumInput1 and NumInput2, then USE the PANEL.\n"
 
   const char* PANEL_SOLVED_DESCRIPTION =
-    "Placeholder";
+    "Sprout drags his branch finger through the clay,\n"
+    "scribing 3 and 1, the prime factors of 27.\n"
+    "He owes old Euclid an apology.\n"
+    "He was certain he'd never use this in the real world!\n"
+    "A moment later there is a rumbling of gears,\n"
+    "and the wall slides away.\n";
 
   const char* PANEL_WRONG_DESCRIPTION = 
-    "Placeholder";
+    "Sprout drags his branch finger through the clay,\n"
+    "scribing his answers, but nothing happens.\n"
+    "He frowns.\n"
+    "If only he'd listened more to Euclid, his math teacher!\n";
 
   void maze_4_handler(GameState* state, ParsedCommand cmd) {
     if (state->flags & FLAG_PANEL_SOLVED) {
@@ -2361,28 +2427,39 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
   const uint8_t maze_4_empty_commands_count = sizeof(maze_4_empty_commands) / sizeof(maze_4_empty_commands[0]);
 
   const char* MAZE_4_EMPTY_DESCRIPTION = 
-    "Placeholder";
+    "The entryway has four exits.\n"
+    "There is a door back to the cave in the WEST,\n"
+    "a corridor sloping gently SOUTH,\n"
+    "and an arch to another room in the NORTH.\n"
+    "The wall in the EAST has slid open, revealing a long hallway.\n";
 
   // Maze 5 State
 
   const StateCommand maze_5_commands[] = {
     { VERB_GO, TARGET_WEST, panel_solved, STATE_MAZE_4, maze_4_handler },
-    { VERB_GO, TARGET_EAST, golem_defeated, STATE_MAZE_6, NULL },
-    { VERB_DODGE, TARGET_NONE, golem_awaiting_defense, STATE_MAZE_5, cmd_golem_dodge },
-    { VERB_SLASH, TARGET_NONE, golem_awaiting_attack,  STATE_MAZE_5, cmd_golem_slash }
+    { VERB_GO, TARGET_EAST, sheep_defeated, STATE_MAZE_6, NULL },
+    { VERB_DODGE, TARGET_NONE, sheep_awaiting_defense, STATE_MAZE_5, cmd_sheep_dodge },
+    { VERB_SLASH, TARGET_NONE, sheep_awaiting_attack,  STATE_MAZE_5, cmd_sheep_slash }
   };
   const uint8_t maze_5_commands_count = sizeof(maze_5_commands) / sizeof(maze_5_commands[0]);
 
   const char* MAZE_5_DESCRIPTION = 
-    "Placeholder";
+    "The hallway extends to the EAST and the WEST.\n"
+    "Sprout takes a turn around a corner and comes face to face\n"
+    "with a large four-footed crature covered with white wool.\n"
+    "It fixes him with a glare from strange square-pupiled eyes.\n"
+    "Sprout's sap races through his capillaries.\n"
+    "It's a sheep! And sheep love to eat tender sprouts.\n"
+    "He readies the CROOK as hunger blooms in the sheep's eyes.\n"
+    "The world blurs around him.\n";
 
   void maze_5_handler(GameState* state, ParsedCommand cmd) {
-    if (state->flags & FLAG_GOLEM_DEFEATED) {
+    if (state->flags & FLAG_SHEEP_DEFEATED) {
       state->current_state = STATE_MAZE_5_EMPTY;
       print_current_description(state);
     } else {
       state->current_state = STATE_MAZE_5;
-      start_golem_combat(state);
+      start_sheep_combat(state);
     }
   }
 
@@ -2390,12 +2467,14 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
 
   const StateCommand maze_5_empty_commands[] = {
     { VERB_GO, TARGET_WEST, panel_solved, STATE_MAZE_4, maze_4_handler },
-    { VERB_GO, TARGET_EAST, golem_defeated, STATE_MAZE_6, NULL }
+    { VERB_GO, TARGET_EAST, sheep_defeated, STATE_MAZE_6, NULL }
   };
   const uint8_t maze_5_empty_commands_count = sizeof(maze_5_empty_commands) / sizeof(maze_5_empty_commands[0]);
 
   const char* MAZE_5_EMPTY_DESCRIPTION = 
-    "Placeholder";
+    "The hallway extends to the EAST and the WEST.\n"
+    "An embarrased sheep presses itself against the wall.\n"
+    "It avoids looking Sprout in the eyes as he passes by.\n";
 
   // Maze 6 State
 
