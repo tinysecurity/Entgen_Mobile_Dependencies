@@ -1729,7 +1729,7 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
 
   enum Phrase {
     PHRASE_NONE = 0,
-    PHRASE_MYLVUQ,
+    PHRASE_MYPLUK,
     PHRASE_FRIEND,
     PHRASE_BLUE
   };
@@ -1775,7 +1775,7 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
   const int TARGET_TABLE_SIZE = sizeof(TARGET_TABLE) / sizeof(TARGET_TABLE[0]);
 
   const PhraseEntry PHRASE_TABLE[] = {
-    { "mylvuq",     PHRASE_MYLVUQ},
+    { "mypluk",     PHRASE_MYPLUK},
     { "friend",     PHRASE_FRIEND},
     { "blue",       PHRASE_BLUE}
   };
@@ -2487,7 +2487,12 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
   const uint8_t maze_6_commands_count = sizeof(maze_6_commands) / sizeof(maze_6_commands[0]);
 
   const char* MAZE_6_DESCRIPTION = 
-    "Placeholder";
+    "This room contains a large loom.\n"
+    "It has a half-finished project on it: a blanket showing a sunset.\n"
+    "There are piles of wool in baskets next to it.\n"
+    "Sprout runs a branch finger along the seat. Hmm, it is dusty.\n"
+    "There is a hallway going WEST,\n" 
+    "a door to the SOUTH, and a passage to the NORTH.\n";
 
   // Maze 7 State
 
@@ -2497,7 +2502,14 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
   const uint8_t maze_7_commands_count = sizeof(maze_7_commands) / sizeof(maze_7_commands[0]);
 
   const char* MAZE_7_DESCRIPTION = 
-    "Placeholder";
+    "This room seems to be a cozy den.\n"
+    "There's a couple of reclining couches around a short table.\n"
+    "A few scrolls are tucked into a case on one wall.\n"
+    "Sprout pulls one out and reads the title.\n"
+    "Ipykz vm aol Tlkpaalyhulhu\n"
+    "Sprout frowns. This is not a language he's familiar with.\n"
+    "At least the picture of the seagull is interesting.\n"
+    "An arch in the SOUTH leads to the entryway.\n";
 
   // Maze 8 State
 
@@ -2510,13 +2522,27 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
   const uint8_t maze_8_commands_count = sizeof(maze_8_commands) / sizeof(maze_8_commands[0]);
 
   const char* MAZE_8_DESCRIPTION = 
-    "Placeholder";
+    "Sprout enters the room and meets a massive cyclops!\n"
+    "She is reading through a thick monocle, but stands\n"
+    "when she notices that she has a visitor.\n"
+    "\'Olssv! P yhylsf nla nblzaz.\n"
+    "Zwlhr, Mypluk, huk il dlsjvtl!\'\n"
+    "The cyclops looks at Sprout expectantly.\n"
+    "Sprout shifts nervously, looking back at the door to the EAST.\n";
 
   const char* INCORRECT_CIPHER = 
-    "Placeholder";
+    "The cyclops's eye narrows in confusion.\n"
+    "She does not seem to understand Sprout's words,\n"
+    "or perhaps they are not what she expected.\n";
 
   const char* CORRECT_CIPHER = 
-    "Placeholder";
+    "The cyclops's face lights up!\n"
+    "\'Nylha! P ht hivba av ohcl kpuuly.\n"
+    "Dvbsk fvb sprl zvtl zald\?\'\n"
+    "She frowns, looking Sprout over.\n"
+    "\'Zpssf tl, vm jvbyzl uva.\n"
+    "Fvb hyl h wshua!\n"
+    "Sla tl nla fvb h upjl wva vm tvpza kpya.\'\n";
 
   void maze_8_handler(GameState* state, ParsedCommand cmd) {
     if (state->flags & FLAG_HAS_BIRD) {
@@ -2540,7 +2566,7 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
   }
 
   void cipher_handler(GameState* state, ParsedCommand cmd) {
-    if (cmd.phrase == PHRASE_MYLVUQ) {
+    if (cmd.phrase == PHRASE_MYPLUK) {
       prompt_for_ack(
         CORRECT_CIPHER,
         cipher_solved_continue);
@@ -2562,13 +2588,30 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
   const uint8_t maze_8_bird_commands_count = sizeof(maze_8_bird_commands) / sizeof(maze_8_bird_commands[0]);
 
   const char* MAZE_8_BIRD_DESCRIPTION = 
-    "Placeholder";
+    "Sprout enters the room and meets a massive cyclops!\n"
+    "She is reading through a thick monocle, but stands\n"
+    "when she notices that she has a visitor.\n"
+    "\'Olssv! P yhylsf nla nblzaz.\n"
+    "Zwlhr, Mypluk, huk il dlsjvtl!\'\n"
+    "\'She asked if you are a friend,\' the bird helpfully supplies.\n"
+    "Both the bird and the cyclops look at Sprout expectently.\n"
+    "Sprout shifts nervously, looking back at the door to the EAST.\n";
 
   const char* INCORRECT_TRANSLATION = 
-    "Placeholder";
+    "The bird sighs, which is an impressive thing to hear a bird do.\n"
+    "\'No, that's not what you need to say.\n"
+    "She said \"speak friend\".\'\n";
 
   const char* CORRECT_TRANSLATION = 
-    "Placeholder";
+    "The cyclops's face lights up!\n"
+    "\'Nylha! P ht hivba av ohcl kpuuly.\n"
+    "Dvbsk fvb sprl zvtl zald\?\'\n"
+    "The bird chirps back:\n"
+    "\'Vm jvbyzl uva, ol pz h wshua.\'\n"
+    "The bird looks at Sprout.\n"
+    "\'She was going to feed you a stew, 
+    which is not appropriate at all. 
+    Umm...what do plants eat?\'\n";
 
   // translation handler and continuations
   
@@ -2606,7 +2649,14 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
   const uint8_t maze_9_commands_count = sizeof(maze_9_commands) / sizeof(maze_9_commands[0]);
 
   const char* MAZE_9_DESCRIPTION = 
-    "Placeholder";
+    "Sprout walks into what seems to be a solarium.\n"
+    "A clever assortment of mirrors directs light into the room\n"
+    "through the sheer rock.\n"
+    "There is a passage going SOUTH and a closed door to the WEST.\n"
+    "Plants fill the space, and Sprout feels a warm contentment\n"
+    "when the sun falls on his leaf.\n"
+    "A bird, previously hidden in the leaves, suddenly chirps up.\n"
+    "\'What do you call it when a bird is happy, but a person is sad\?\'\n";
 
   void maze_9_handler(GameState* state, ParsedCommand cmd) {
     if (state->flags & FLAG_RIDDLE_SOLVED) {
@@ -2622,10 +2672,13 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
   }
 
   const char* INCORRECT_RIDDLE = 
-    "Placeholder";
+    "\'No, that's not the answer to the riddle.\n"
+    "Try again!\'\n";
 
   const char* CORRECT_RIDDLE = 
-    "Placeholder";
+    "\'Don't you find that odd\?\' the bird inquires,\n"
+    "then it flies over and taps on the door with its beak.\n"
+    "\'Lualy\' a voice says from inside.\n";
 
   // riddle handler and continuations
   
@@ -2661,10 +2714,16 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
   const uint8_t maze_9_empty_commands_count = sizeof(maze_9_empty_commands) / sizeof(maze_9_empty_commands[0]);
 
   const char* MAZE_9_EMPTY_DESCRIPTION = 
-    "Placeholder";
+    "Sprout looks around the solarium, taking in the healthy plants.\n"
+    "Whomever is behind the door to the WEST, they can't be that bad.\n"
+    "Still, he finds himself a little nervous to go on.\n"
+    "He looks back to the SOUTH where he came in.\n"
+    "\'Well\?\' the bird asks, \'Are you coming\?\'\n";
 
   const char* COLLECT_BIRD = 
-    "Placeholder";
+    "Sprout approaches the door, but then pauses and lifts one branch.\n"
+    "The bird hops down and rests on the proffered limb.\n"
+    "\'This is comfy,\' the bird says. \'You're alright, kid.\'\n";
 
   // riddle handler and continuations
   
@@ -2689,7 +2748,10 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
   const uint8_t maze_9_no_bird_commands_count = sizeof(maze_9_no_bird_commands) / sizeof(maze_9_no_bird_commands[0]);
 
   const char* MAZE_9_NO_BIRD_DESCRIPTION = 
-    "Placeholder";
+    "Sprout stands in front of a door going WEST.\n"
+    "The solarium, with a passage going SOUTH, is behind him.\n"
+    "He takes a deep breath through his leaf.\n" 
+    "He is ready to meet the owner of this home.\n";
   
   // End Leave State
 
@@ -2699,7 +2761,13 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
   const uint8_t end_leave_commands_count = sizeof(end_leave_commands) / sizeof(end_leave_commands[0]);
 
   const char* END_LEAVE_DESCRIPTION = 
-    "Placeholder";
+    "The cyclops seems sad when Sprout leaves, but does not stop him.\n"
+    "Sprout makes his way out of the mountain home.\n"
+    "He is able to find what he needs to fix his ship,\n"
+    "and the next day he continues on his journey.\n"
+    "As he sails away, he sees the cyclops up on the cliff.\n"
+    "She waves farewell. He waves back.\n"
+    "He'll always wonder what the woman was saying.\n";
 
   // End Friends Solve State
 
@@ -2709,7 +2777,16 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
   const uint8_t end_friends_solve_commands_count = sizeof(end_friends_solve_commands) / sizeof(end_friends_solve_commands[0]);
 
   const char* END_FRIENDS_SOLVE_DESCRIPTION = 
-    "Placeholder";
+    "Sprout and the cyclops enjoy a fine meal.\n"
+    "Afterwards, she gives him a pot in the solarium to rest.\n"
+    "Over the next few days Sprout learns more of her language.\n"
+    "After a while Sprout starts to feel restless.\n"
+    "\'Aohur fvb mvy fvby ovzwpahspaf,\' he says,\n"
+    "\'iba pa pz aptl mvy tl av slhcl.\'\n"
+    "The cyclops nods, and gets him a gift - a sail woven on her loom!\n"
+    "When Sprout sails away, he sees his new friend up on the cliff.\n"
+    "He waves goodbye, hoping that some day he'll visit again.\n"
+    "He will have many new stories to share!\n";
 
   // End Friends Bird State
 
@@ -2719,7 +2796,15 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
   const uint8_t end_friends_bird_commands_count = sizeof(end_friends_bird_commands) / sizeof(end_friends_bird_commands[0]);
 
   const char* END_FRIENDS_BIRD_DESCRIPTION = 
-    "Placeholder";
+    "Sprout, the cyclops, and the bird enjoy a meal.\n"
+    "The cyclops eats stew, the bird pecks at seeds,\n"
+    "and Sprout lounges in a pot of moist earth.\n"
+    "They enjoy many days of interesting conversation.\n"
+    "The bird even helps Sprout make friends with the sheep.\n"
+    "It speaks their language too, it seems.\n"
+    "After some time, Sprout must set out again.\n"
+    "He leaves with gifts of good dirt, clean water, and lots of wool.\n"
+    "He has made many friends here. It makes him happy.\n";
 
   // The state table
   // Order MUST match the StateId enum above.
