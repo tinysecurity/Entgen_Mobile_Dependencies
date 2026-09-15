@@ -38,7 +38,7 @@
   #include <BlockDevice.h>
   #include <LittleFileSystem.h>
   #include <MBRBlockDevice.h>
-  #include "FATFileSystem.h"
+  #include <FATFileSystem.h>
   #include <SPI.h>
   #include <ArduinoMqttClient.h>
   #include <ArduinoJson.h>
@@ -65,7 +65,7 @@
 
   #define MAX_NAME_LEN 32
   #define MAX_TOPIC_LEN 64
-  #define MAX_STR_LEN 512
+  #define MAX_STR_LEN 600
   #define MAX_TOPICS 64
 
   enum class TopicType : uint8_t {
@@ -1032,6 +1032,8 @@
     if (!connectWiFi()) {
       Serial.println("WiFi not connected at boot -- will keep retrying from loop().");
     }
+
+    mqttClient.setTxPayloadSize(600);
 
     if (connectMQTT()) {
       applyTopicSubscriptions(registration);
@@ -2540,7 +2542,7 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
 
       Phrase p = lookup_phrase(tokens[i]);
       if (p != PHRASE_NONE) {
-        if (cmd.phrase != TARGET_NONE) {
+        if (cmd.phrase != PHRASE_NONE) {
           cmd.too_many = true; // a second target showed up
         }
         cmd.phrase = p;
@@ -2554,7 +2556,7 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
   // -- Wait-for-Acknowledgement --------------------------------
 
   void prompt_for_ack(const char* message, AckCallback continuation) {
-    char buffer[160];
+    char buffer[600];
     snprintf(buffer, sizeof(buffer), "%s Press A to continue.", message);
     sproutSetOutputStr(buffer);
 
@@ -2831,6 +2833,7 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
 
   void cipher_handler(GameState* state, ParsedCommand cmd) {
     if (cmd.phrase == PHRASE_MYPLUK) {
+      state->flags |= FLAG_CIPHER_SOLVED;
       prompt_for_ack(
         CORRECT_CIPHER,
         cipher_solved_continue);
@@ -2896,6 +2899,7 @@ TopicLookupResult findTopicByNameAnywhere(const EnrollmentConfig &cfg, const cha
 
   void riddle_handler(GameState* state, ParsedCommand cmd) {
     if (cmd.phrase == PHRASE_BLUE) {
+      state->flags |= FLAG_RIDDLE_SOLVED;
       prompt_for_ack(
         CORRECT_RIDDLE,
         riddle_solved_continue);
