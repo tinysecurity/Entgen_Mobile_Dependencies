@@ -71,6 +71,20 @@ allow_anonymous false
 log_type all
 EOF
 echo "--------------ENTGEN CONF ADDED--------------------"
+
+sudo tee /etc/mosquitto/mosquitto.conf > /dev/null << 'EOF'
+pid_file /run/mosquitto/mosquitto.pid
+
+persistence true
+persistence_location /var/lib/mosquitto/
+
+
+log_dest file /var/log/mosquitto/mosquitto.log
+
+include_dir /etc/mosquitto/conf.d
+
+EOF
+
 sudo tee /etc/mosquitto/acl.conf > /dev/null << 'EOF'
 # Bootstrap identity — permanently restricted, write-only, one topic.
 # CN comes from the shared bootstrap cert already in ca_bootstrap_service.dart.
