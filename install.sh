@@ -28,9 +28,9 @@ echo "Python scripts moved to entgen"
 # entgen-firmware makes the web server to host the files
 # entgen-enrollment captures the openADR info for the provisioning flow
 # entgen-ca-bootstrap runs a python script that runs the 2 CA system
-sudo cp entgen-ca-bootstrap.service /etc/systemd/system/entgen-ca-bootstrap.service
-sudo cp entgen-enrollment.service /etc/systemd/system/entgen-enrollment.service
-sudo cp entgen-firmware.service /etc/systemd/system/entgen-firmware.service
+sudo cp ./services/entgen-ca-bootstrap.service /etc/systemd/system/entgen-ca-bootstrap.service
+sudo cp ./services/entgen-enrollment.service /etc/systemd/system/entgen-enrollment.service
+sudo cp ./services/entgen-firmware.service /etc/systemd/system/entgen-firmware.service
 
 
 BOOTSTRAP_SERVICE="entgen-ca-bootstrap.service"
