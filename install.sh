@@ -28,9 +28,9 @@ echo "Python scripts moved to entgen"
 # entgen-firmware makes the web server to host the files
 # entgen-enrollment captures the openADR info for the provisioning flow
 # entgen-ca-bootstrap runs a python script that runs the 2 CA system
-sudo cp entgen-ca-bootstrap.service /etc/systemd/system/entgen-ca-bootstrap.service
-sudo cp entgen-enrollment.service /etc/systemd/system/entgen-enrollment.service
-sudo cp entgen-firmware.service /etc/systemd/system/entgen-firmware.service
+sudo cp ./services/entgen-ca-bootstrap.service /etc/systemd/system/entgen-ca-bootstrap.service
+sudo cp ./services/entgen-enrollment.service /etc/systemd/system/entgen-enrollment.service
+sudo cp ./services/entgen-firmware.service /etc/systemd/system/entgen-firmware.service
 
 
 BOOTSTRAP_SERVICE="entgen-ca-bootstrap.service"
@@ -71,6 +71,20 @@ allow_anonymous false
 log_type all
 EOF
 echo "--------------ENTGEN CONF ADDED--------------------"
+
+sudo tee /etc/mosquitto/mosquitto.conf > /dev/null << 'EOF'
+pid_file /run/mosquitto/mosquitto.pid
+
+persistence true
+persistence_location /var/lib/mosquitto/
+
+
+log_dest file /var/log/mosquitto/mosquitto.log
+
+include_dir /etc/mosquitto/conf.d
+
+EOF
+
 sudo tee /etc/mosquitto/acl.conf > /dev/null << 'EOF'
 # Bootstrap identity — permanently restricted, write-only, one topic.
 # CN comes from the shared bootstrap cert already in ca_bootstrap_service.dart.
