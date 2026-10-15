@@ -78,8 +78,8 @@ bool   provisionComplete = false;
 String g_deviceId   = "";
 String g_brokerHost = "";
 int    g_brokerPort = 1883; // default to open debug port
-String g_wifiSsid   = "ORBI74";
-String g_wifiPass   = "huskymesa929";
+String g_wifiSsid   = "",
+String g_wifiPass   = "";
 String g_mqttUsername = "";
 String g_mqttPassword = "";
 
